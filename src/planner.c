@@ -50,6 +50,7 @@ unsigned char*** setMatrix( int X, int Y, int Z){
             matrix[y][z] = tmpZ;
         }
     }
+    
     for (int y = 0; y < Y; y++) {
         for (int z = 0; z < Z; z++) {
             for (int x = 0; x < X; x++) {
@@ -57,6 +58,7 @@ unsigned char*** setMatrix( int X, int Y, int Z){
             }
         }
     }
+    
     return matrix;
 }
 
@@ -284,37 +286,26 @@ void printReactor(struct reactor *r, int X, int Y, int Z) {
 
 void generateCombinations(unsigned char ***matrix, int x, int y, int z, int X, int Y, int Z, struct listHead *lHeadPtr) {
     if(x+z+y != 0){
-        enum bool res = checkMatrix(matrix, x, y, z, X, Y, Z);
-        if(res != true){
-            return;
-        } else{
-            if (x == X) {
-                struct reactor r;
-                res = checkWholeMatrix(matrix, X, Y, Z, &r);
-                if(res == true){
-                    addToList(lHeadPtr, r);
-                    return;  
-                } else{
-                    return;  
-                }
+        enum bool res;
+        if (x == X) {
+            struct reactor r;
+            res = checkWholeMatrix(matrix, X, Y, Z, &r);
+            if(res == true){
+                addToList(lHeadPtr, r);  
             }
+            return;
         }
     }
-    
-    
 
     for (int value = RED; value <= MAX_VALUE; value++) {
         matrix[y][z][x] = value;
         if (z + 1 < Z) {
             generateCombinations(matrix, x, y, z + 1, X, Y, Z, lHeadPtr);
-            //generateCombinations(matrix, x + 1, y, z, X, Y, Z, lHeadPtr);
         } else if (y + 1 < Y) {
             generateCombinations(matrix, x, y + 1, 0, X, Y, Z, lHeadPtr);
-            //generateCombinations(matrix, 0, y, z + 1, X, Y, Z, lHeadPtr);
-        } else {
+        } else{
             generateCombinations(matrix, x + 1, 0, 0, X, Y, Z, lHeadPtr);
-            //generateCombinations(matrix, 0 , y + 1, 0, X, Y, Z, lHeadPtr);
-        }
+        }        
     }
 }
 
@@ -358,11 +349,11 @@ int main(int argc, char *argv[]) {
     const int Z = atoi (argv[3]);
     
     if(Z <= 0){
-        fprintf (stderr, "Error: Y <= 0 Exiting program.");
+        fprintf (stderr, "Error: Z <= 0 Exiting program.");
         return (-1);
     }
 
-    unsigned char ***matrix = setMatrix(X, Y, X);
+    unsigned char ***matrix = setMatrix(X, Y, Z);
     printMatrix(matrix, X, Y, Z);
     
     struct listHead lHead;
@@ -371,7 +362,7 @@ int main(int argc, char *argv[]) {
     clock_t t;
     double cpu_time_used; 
     t = clock();
-    generateCombinations(matrix, 0, 0, 0, X, Y, X, &lHead);
+    generateCombinations(matrix, 0, 0, 0, X, Y, Z, &lHead);
     freeMatrix(matrix, Y, Z);
 
     struct reactor *best = getBestReactor(&lHead);
