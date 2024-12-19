@@ -2,7 +2,7 @@
 ##  Makefile
 ##
 
-CFLAGS += -Wall -W -pipe -O2 -std=gnu99
+CFLAGS += -Wall -W -pipe -O2 -std=gnu99 -pthread
 CC ?= gcc
 DBFLAGS += -g -O0
 SRC_DIR = src
