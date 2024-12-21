@@ -11,13 +11,13 @@ pthread_barrier_t barrier;
 
 
 struct ThreadArgs {
-    unsigned char ***matrix;
+    unsigned char *matrix;
     int x, y, z, X, Y, Z;
     struct listHead *lHeadPtr;
 };
 
 struct reactor{
-    unsigned char ***matrix;
+    unsigned char *matrix;
     double basePower;
     double baseHeat;
     double totalPower;
@@ -49,51 +49,30 @@ enum blockType {
     HEL, 
 };
 
-unsigned char*** setMatrix( int X, int Y, int Z){
-    unsigned char ***matrix = (unsigned char ***)malloc(Y*sizeof(unsigned char**));
-    for (int y = 0; y < Y; y++) {
-        unsigned char **tmpY = (unsigned char **)malloc(Z*sizeof(unsigned char*));
-        matrix[y] = tmpY;
-    }
-    for (int y = 0; y < Y; y++) {
-        for (int z = 0; z < Z; z++) {
-            unsigned char *tmpZ = (unsigned char *)malloc(X*sizeof(unsigned char));
-            matrix[y][z] = tmpZ;
-        }
-    }
-    
-    for (int y = 0; y < Y; y++) {
-        for (int z = 0; z < Z; z++) {
-            for (int x = 0; x < X; x++) {
-                matrix[y][z][x] = DEF;                
-            }
-        }
-    }
+int offset(int x, int y, int z, int X, int Z) { 
+    return (y * Z * X) + (z * X) + x;
+}
+
+unsigned char* setMatrix( int X, int Y, int Z){
+    unsigned char *matrix = malloc(X * Y * Z * sizeof(unsigned char));
+    memset(matrix, DEF, X * Y * Z * sizeof(unsigned char));
     
     return matrix;
 }
 
-void freeMatrix(unsigned char ***matrix, int Y, int Z){
-    for (int y = 0; y < Y; y++) {
-        for (int z = 0; z < Z; z++) {
-            free(matrix[y][z]);
+
+void freeList(struct listItem* head){
+    struct listItem* tmp;
+
+    while (head != NULL){
+        tmp = head;
+        head = head->next;
+        if(tmp->r != NULL){
+            free(tmp->r->matrix);
+            free(tmp->r);
         }
-        free(matrix[y]);
-    }
-    free(matrix);
-}
 
-void freeList(struct listItem* head, int Y, int Z)
-{
-   struct listItem* tmp;
-
-   while (head != NULL)
-    {
-       tmp = head;
-       head = head->next;
-       freeMatrix(tmp->r->matrix, Y, Z);
-       free(tmp->r);
-       free(tmp);
+        free(tmp);
     }
 }
 
@@ -111,26 +90,26 @@ void addToList(struct listHead *lHeadPtr, struct reactor *r){
     }
 }
 
-int getAdjacentBlock(unsigned char ***matrix, int x, int y, int z, int X, int Y, int Z, enum blockType type){
+int getAdjacentBlock(unsigned char *matrix, int x, int y, int z, int X, int Y, int Z, enum blockType type){
     int adj = 0;
 
     if((x-1) >= 0){
-        if(matrix[y][z][x-1] == type) adj++;
+        if(matrix[offset(x-1, y, z, X, Z)] == type) adj++;
     }
     if((x+1) < X){
-        if(matrix[y][z][x+1] == type) adj++;
+        if(matrix[offset(x+1, y, z, X, Z)] == type) adj++;
     }
     if((y-1) >= 0){
-        if(matrix[y-1][z][x] == type) adj++;
+        if(matrix[offset(x, y-1, z, X, Z)] == type) adj++;
     }
     if((y+1) < Y){
-        if(matrix[y+1][z][x] == type) adj++;
+        if(matrix[offset(x, y+1, z, X, Z)] == type) adj++;
     }
     if((z-1) >= 0){
-        if(matrix[y][z-1][x] == type) adj++;
+        if(matrix[offset(x, y, z-1, X, Z)] == type) adj++;
     }
     if((z+1) < Z){
-        if(matrix[y][z+1][x] == type) adj++;
+        if(matrix[offset(x, y, z+1, X, Z)] == type) adj++;
     }
 
     return adj;
@@ -140,7 +119,7 @@ void calculatePowerHeat(struct reactor *r, int X, int Y, int Z){
     for (int y = 0; y < Y; y++) {
         for (int z = 0; z < Z; z++) {
             for (int x = 0; x < X; x++) {
-                unsigned char toCheck = r->matrix[y][z][x];
+                unsigned char toCheck = r->matrix[offset(x, y, z, X, Z)];
                 int adjCELL;
                 switch (toCheck) {
                     case RED:
@@ -177,11 +156,11 @@ void calculatePowerHeat(struct reactor *r, int X, int Y, int Z){
     }
 }
 
-void copyMatrix(unsigned char ***matrixSrc, unsigned char ***matrixDst, int X, int Y, int Z){
+void copyMatrix(unsigned char *matrixSrc, unsigned char *matrixDst, int X, int Y, int Z){
     for (int y = 0; y < Y; y++) {
         for (int z = 0; z < Z; z++) {
             for (int x = 0; x < X; x++) {
-                matrixDst[y][z][x] = matrixSrc[y][z][x];
+                matrixDst[offset(x, y, z, X, Z)] = matrixSrc[offset(x, y, z, X, Z)];
             }
         }
     }
@@ -191,7 +170,7 @@ enum bool checkWholeMatrix(struct reactor *r, int X, int Y, int Z){
     for (int y = 0; y < Y; y++) {
         for (int z = 0; z < Z; z++) {
             for (int x = 0; x < X; x++) {
-                unsigned char toCheck = r->matrix[y][z][x];
+                unsigned char toCheck = r->matrix[offset(x, y, z, X, Z)];
                 int adjCELL;
                 switch (toCheck) {
                     case RED:
@@ -225,11 +204,12 @@ enum bool checkWholeMatrix(struct reactor *r, int X, int Y, int Z){
     
 }
 
-void printMatrix(unsigned char ***matrix, int X, int Y, int Z) {
+
+void printMatrix(unsigned char *matrix, int X, int Y, int Z) {
     for (int y = 0; y < Y; y++) {
         for (int z = 0; z < Z; z++) {
             for (int x = 0; x < X; x++) {
-                printf("%c ", print[matrix[y][z][x]]);
+                printf("%c ", print[matrix[offset(x, y, z, X, Z)]]);
             }
             printf("\n");
         }
@@ -243,7 +223,7 @@ void printReactor(struct reactor *r, int X, int Y, int Z) {
     for (int y = 0; y < Y; y++) {
         for (int z = 0; z < Z; z++) {
             for (int x = 0; x < X; x++) {
-                printf("%c ", print[r->matrix[y][z][x]]);
+                printf("%c ", print[r->matrix[offset(x, y, z, X, Z)]]);
             }
             printf("\n");
         }
@@ -251,7 +231,7 @@ void printReactor(struct reactor *r, int X, int Y, int Z) {
     }
 }
 
-void generateCombinations(unsigned char ***matrix, int x, int y, int z, int X, int Y, int Z, struct listHead *lHeadPtr) {
+void generateCombinations(unsigned char *matrix, int x, int y, int z, int X, int Y, int Z, struct listHead *lHeadPtr) {
     if(x+z+y != 0){
         if (x == X) {
             struct reactor *r = (struct reactor *)malloc(sizeof(struct reactor));
@@ -264,7 +244,7 @@ void generateCombinations(unsigned char ***matrix, int x, int y, int z, int X, i
     }
 
     for (int value = RED; value <= MAX_VALUE; value++) {
-        matrix[y][z][x] = value;
+        matrix[offset(x, y, z, X, Z)] = value;
         if (z + 1 < Z) {
             generateCombinations(matrix, x, y, z + 1, X, Y, Z, lHeadPtr);
         }else{
@@ -328,8 +308,9 @@ int main(int argc, char *argv[]) {
         return (-1);
     }
 
-    unsigned char ***matrix = setMatrix(X, Y, Z);
+    unsigned char *matrix = setMatrix(X, Y, Z);
     printMatrix(matrix, X, Y, Z);
+    
     
     struct listHead lHead;
     lHead.head = NULL;
@@ -352,6 +333,7 @@ int main(int argc, char *argv[]) {
             printf("Created thread %d\n",y);
         }
     }
+    
 
     for (int y = 0; y < Y; y++) {
         pthread_join(threads[y], NULL);
@@ -370,12 +352,15 @@ int main(int argc, char *argv[]) {
     if(res == true){
         addToList(&newLHead, &r);
     }
+    int item = 0;
     while(oldItem->next != NULL){
         oldItem = oldItem->next;
         enum bool res = checkWholeMatrix(oldItem->r, X, Y, Z);
         if(res == true){
             addToList(&newLHead, oldItem->r);
+            oldItem->r = NULL;
         }
+        item++;
     }
 
 
@@ -385,8 +370,9 @@ int main(int argc, char *argv[]) {
     t = clock() - t;
     cpu_time_used = ((double) t) / CLOCKS_PER_SEC;
     printf("Took %f seconds to execute \n", cpu_time_used);
-    
+    free(matrix);
     free(threads);
-    freeList(lHead.head, Y, Z);
+    freeList(newLHead.head);
+    freeList(lHead.head);
     return 0;
 }
