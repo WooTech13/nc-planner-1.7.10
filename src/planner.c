@@ -1,23 +1,14 @@
-#include <pthread.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
 
 #define MAX_VALUE HEL
-
-pthread_mutex_t list_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_barrier_t barrier;
-
-
-struct ThreadArgs {
-    unsigned char *matrix;
-    int x, y, z, X, Y, Z;
-    struct listHead *lHeadPtr;
-};
+#define OFFSET(x, y, z, Y, Z) ((x) * (Y * Z) + (y) * Z + (z))
 
 struct reactor{
-    unsigned char *matrix;
+    uint8_t *matrix;
     double basePower;
     double baseHeat;
     double totalPower;
@@ -33,51 +24,62 @@ struct listItem{
     struct listItem *next;
 };
 
-enum bool{
-    false,
-    true
-};
-
-char print[] = {'x','R','C','#','H'};
+char print[] = {'R','C','#','H'};
 
 
 enum blockType {
-    DEF,
     RED,
     CRYO,
     CELL,
-    HEL, 
+    HEL,
 };
 
-int offset(int x, int y, int z, int X, int Z) { 
-    return (y * Z * X) + (z * X) + x;
-}
 
-unsigned char* setMatrix( int X, int Y, int Z){
-    unsigned char *matrix = malloc(X * Y * Z * sizeof(unsigned char));
-    memset(matrix, DEF, X * Y * Z * sizeof(unsigned char));
+
+
+uint8_t* setMatrix(int X, int Y, int Z){
+    uint8_t *matrix = (uint8_t *) malloc(X * Y * Z * sizeof(uint8_t));
+    memset(matrix, RED, X * Y * Z * sizeof(uint8_t));
     
     return matrix;
 }
 
 
 void freeList(struct listItem* head){
-    struct listItem* tmp;
+    struct listItem* current = head->next;
+    struct listItem *tmp;
 
-    while (head != NULL){
-        tmp = head;
-        head = head->next;
-        if(tmp->r != NULL){
-            free(tmp->r->matrix);
-            free(tmp->r);
-        }
+    while (current != NULL){
+        tmp = current;
+        current = current->next;
 
+        free(tmp->r->matrix);
+        free(tmp->r);
         free(tmp);
     }
 }
 
+void printMatrix(uint8_t *matrix, int X, int Y, int Z) {
+    for (int y = 0; y < Y; y++) {
+        for (int x = 0; x < X; x++) {
+            for (int z = 0; z < Z; z++) {
+                printf("%c ", print[matrix[OFFSET(x, y, z, Y, Z)]]);
+            }
+            printf("\n");
+        }
+        printf("\n");
+    }
+}
+
+void printReactor(struct reactor *r, int X, int Y, int Z) {
+    printf("With base power %f and base heat %f:\npower: %f\nheat: %f\n",r->basePower, r->baseHeat, r->totalPower, r->totalHeat);
+
+    printMatrix(r->matrix, X, Y, Z);
+}
+
 void addToList(struct listHead *lHeadPtr, struct reactor *r){
     struct listItem *item = lHeadPtr->head;
+
     if(item != NULL){
         while(item->next != NULL) item = item->next;
         item->next = (struct listItem *) malloc(sizeof(struct listItem));
@@ -94,22 +96,22 @@ int getAdjacentBlock(unsigned char *matrix, int x, int y, int z, int X, int Y, i
     int adj = 0;
 
     if((x-1) >= 0){
-        if(matrix[offset(x-1, y, z, X, Z)] == type) adj++;
+        if(matrix[OFFSET(x-1, y, z, X, Z)] == type) adj++;
     }
     if((x+1) < X){
-        if(matrix[offset(x+1, y, z, X, Z)] == type) adj++;
+        if(matrix[OFFSET(x+1, y, z, X, Z)] == type) adj++;
     }
     if((y-1) >= 0){
-        if(matrix[offset(x, y-1, z, X, Z)] == type) adj++;
+        if(matrix[OFFSET(x, y-1, z, X, Z)] == type) adj++;
     }
     if((y+1) < Y){
-        if(matrix[offset(x, y+1, z, X, Z)] == type) adj++;
+        if(matrix[OFFSET(x, y+1, z, X, Z)] == type) adj++;
     }
     if((z-1) >= 0){
-        if(matrix[offset(x, y, z-1, X, Z)] == type) adj++;
+        if(matrix[OFFSET(x, y, z-1, X, Z)] == type) adj++;
     }
     if((z+1) < Z){
-        if(matrix[offset(x, y, z+1, X, Z)] == type) adj++;
+        if(matrix[OFFSET(x, y, z+1, X, Z)] == type) adj++;
     }
 
     return adj;
@@ -119,25 +121,21 @@ void calculatePowerHeat(struct reactor *r, int X, int Y, int Z){
     for (int y = 0; y < Y; y++) {
         for (int z = 0; z < Z; z++) {
             for (int x = 0; x < X; x++) {
-                unsigned char toCheck = r->matrix[offset(x, y, z, X, Z)];
-                int adjCELL;
-                switch (toCheck) {
+                switch (r->matrix[OFFSET(x, y, z, Y, Z)]) {
                     case RED:
-                        adjCELL = getAdjacentBlock(r->matrix, x, y, z, X, Y, Z, CELL);
-                        if(adjCELL != 0){
+                        if(getAdjacentBlock(r->matrix, x, y, z, X, Y, Z, CELL) != 0){
                             r->totalHeat = r->totalHeat - 160;
                         } else{
                             r->totalHeat = r->totalHeat - 80;
                         }
                         break;
                     case CELL:
-                        adjCELL = getAdjacentBlock(r->matrix, x, y, z, X, Y, Z, CELL);
+                        int adjCELL = getAdjacentBlock(r->matrix, x, y, z, X, Y, Z, CELL);
                         r->totalPower = r->totalPower + (adjCELL + 1) * r->basePower;
                         r->totalHeat = r->totalHeat + (((adjCELL+1) * (adjCELL + 2))/(double)2) * r->baseHeat;
                         break;
                     case CRYO:
-                        adjCELL = getAdjacentBlock(r->matrix, x, y, z, X, Y, Z, CRYO);
-                        if(adjCELL == 0){
+                        if(getAdjacentBlock(r->matrix, x, y, z, X, Y, Z, CRYO) == 0){
                             r->totalHeat = r->totalHeat - 160;
                         } else{
                             r->totalHeat = r->totalHeat - 80;
@@ -145,8 +143,6 @@ void calculatePowerHeat(struct reactor *r, int X, int Y, int Z){
                         break;
                     case HEL:
                         r->totalHeat = r->totalHeat - 125;
-                        break;
-                    case DEF:
                         break;
                     default:
                         break;
@@ -156,41 +152,31 @@ void calculatePowerHeat(struct reactor *r, int X, int Y, int Z){
     }
 }
 
-void copyMatrix(unsigned char *matrixSrc, unsigned char *matrixDst, int X, int Y, int Z){
+void copyMatrix(uint8_t *matrixSrc, uint8_t *matrixDst, int X, int Y, int Z){
     for (int y = 0; y < Y; y++) {
         for (int z = 0; z < Z; z++) {
             for (int x = 0; x < X; x++) {
-                matrixDst[offset(x, y, z, X, Z)] = matrixSrc[offset(x, y, z, X, Z)];
+                matrixDst[OFFSET(x, y, z, Y, Z)] = matrixSrc[OFFSET(x, y, z, Y, Z)];
             }
         }
     }
 }
 
-enum bool checkWholeMatrix(struct reactor *r, int X, int Y, int Z){
+int checkWholeMatrix(struct reactor *r, int X, int Y, int Z){
     for (int y = 0; y < Y; y++) {
         for (int z = 0; z < Z; z++) {
             for (int x = 0; x < X; x++) {
-                unsigned char toCheck = r->matrix[offset(x, y, z, X, Z)];
-                int adjCELL;
-                switch (toCheck) {
+                switch (r->matrix[OFFSET(x, y, z, Y, Z)]) {
                     case RED:
-                        adjCELL = getAdjacentBlock(r->matrix, x, y, z, X, Y, Z, CELL);
-                        if(adjCELL == 0){
-                            return false;
-                        }
+                        if(getAdjacentBlock(r->matrix, x, y, z, X, Y, Z, CELL) == 0) return 0;
                     case CELL:
                         continue;
                     case CRYO:
-                        adjCELL = getAdjacentBlock(r->matrix, x, y, z, X, Y, Z, CRYO);
-                        if(adjCELL > 0){
-                            return false;
-                        }
+                        if(getAdjacentBlock(r->matrix, x, y, z, X, Y, Z, CRYO) > 0) return 0;
                     case HEL:
                         continue;
-                    case DEF:
-                        return false;
                     default:
-                        return false; 
+                        return 0;
                 }
             }
         }
@@ -201,63 +187,41 @@ enum bool checkWholeMatrix(struct reactor *r, int X, int Y, int Z){
     r->totalHeat = 0;
     calculatePowerHeat(r, X, Y, Z);
     return r->totalHeat <= 0;
-    
+
 }
 
-
-void printMatrix(unsigned char *matrix, int X, int Y, int Z) {
-    for (int y = 0; y < Y; y++) {
-        for (int z = 0; z < Z; z++) {
-            for (int x = 0; x < X; x++) {
-                printf("%c ", print[matrix[offset(x, y, z, X, Z)]]);
-            }
-            printf("\n");
+int incrementMatrix(uint8_t *matrix, size_t total_size) {
+    for (size_t i = 0; i < total_size; i++) {
+        if (matrix[i] < HEL) {
+            matrix[i]++;
+            return 1;
         }
-        printf("\n");
+        matrix[i] = RED;
     }
+    return 0;
 }
 
-void printReactor(struct reactor *r, int X, int Y, int Z) {
-    printf("With base power %f and base heat %f:\npower: %f\nheat: %f\n",r->basePower, r->baseHeat, r->totalPower, r->totalHeat);
+void generateMatrices(size_t X, size_t Y, size_t Z, struct listHead *lHead) {
+    uint8_t *matrix = setMatrix(X, Y, Z);
+    uint64_t count = 0;
 
-    for (int y = 0; y < Y; y++) {
-        for (int z = 0; z < Z; z++) {
-            for (int x = 0; x < X; x++) {
-                printf("%c ", print[r->matrix[offset(x, y, z, X, Z)]]);
-            }
-            printf("\n");
+    for (uint64_t i = 0; i < (1ULL << (2 * X * Y * Z)); i++) {
+        uint8_t *local_matrix = setMatrix(X, Y, Z);
+        for (size_t j = 0; j < X * Y * Z; j++) {
+            local_matrix[j] = (i >> (2 * j)) & 3;
         }
-        printf("\n");
-    }
-}
-
-void generateCombinations(unsigned char *matrix, int x, int y, int z, int X, int Y, int Z, struct listHead *lHeadPtr) {
-    if(x+z+y != 0){
-        if (x == X) {
-            struct reactor *r = (struct reactor *)malloc(sizeof(struct reactor));
-            r->matrix = setMatrix(X, Y, Z);
-            copyMatrix(matrix, r->matrix, X, Y, Z);
-            pthread_barrier_wait(&barrier);
-            addToList(lHeadPtr, r);
-            return;
+        struct reactor *r = (struct reactor *) malloc(sizeof(struct reactor));
+        r->matrix = local_matrix;
+        if (checkWholeMatrix(r, X, Y, Z)) {
+            addToList(lHead, r);
+        } else {
+            free(r->matrix);
+            free(r);
         }
+        count++;
     }
-
-    for (int value = RED; value <= MAX_VALUE; value++) {
-        matrix[offset(x, y, z, X, Z)] = value;
-        if (z + 1 < Z) {
-            generateCombinations(matrix, x, y, z + 1, X, Y, Z, lHeadPtr);
-        }else{
-            generateCombinations(matrix, x + 1, y, 0, X, Y, Z, lHeadPtr);
-        }        
-    }
-}
-
-void *threadFunction(void *arg) {
-    struct ThreadArgs *args = (struct ThreadArgs *)arg;
-    generateCombinations(args->matrix, 0, args->y, 0, args->X, args->Y, args->Z, args->lHeadPtr);
-    free(arg);
-    return NULL;
+    printf("Total matrices generated: %lu\n", count);
+    free(matrix);
 }
 
 struct reactor* getBestReactor(struct listHead *lHeadPtr){
@@ -288,91 +252,41 @@ int main(int argc, char *argv[]) {
     }
 
     const int X = atoi (argv[1]);
-    
+
     if(X <= 0){
         fprintf (stderr, "Error: X <= 0 Exiting program.");
         return (-1);
     }
 
     const int Y = atoi (argv[2]);
-    
+
     if(Y <= 0){
         fprintf (stderr, "Error: Y <= 0 Exiting program.");
         return (-1);
     }
 
     const int Z = atoi (argv[3]);
-    
+
     if(Z <= 0){
         fprintf (stderr, "Error: Z <= 0 Exiting program.");
         return (-1);
     }
 
-    unsigned char *matrix = setMatrix(X, Y, Z);
-    printMatrix(matrix, X, Y, Z);
-    
-    
     struct listHead lHead;
     lHead.head = NULL;
 
     clock_t t;
-    double cpu_time_used; 
+    double cpu_time_used;
     t = clock();
 
-    pthread_barrier_init(&barrier, NULL, Y);
-    pthread_t *threads = malloc(Y * sizeof(pthread_t));
+    generateMatrices(X, Y, Z, &lHead);
 
-    for (int y = 0; y < Y; y++) {
-        struct ThreadArgs *args = malloc(sizeof(struct ThreadArgs));
-        *args = (struct ThreadArgs){matrix, 0, y, 0, X, Y, Z, &lHead};
-        
-        if (pthread_create(&threads[y], NULL, threadFunction, args) != 0) {
-            fprintf(stderr, "Error creating thread for Y=%d\n", y);
-            return -1;
-        } else {
-            printf("Created thread %d\n",y);
-        }
-    }
-    
-
-    for (int y = 0; y < Y; y++) {
-        pthread_join(threads[y], NULL);
-        printf("Thread %d done\n",y);
-    }
-    pthread_barrier_destroy(&barrier);
-
-
-    
-    struct listItem *oldItem = lHead.head;
-    struct reactor r;
-
-    struct listHead newLHead;
-    newLHead.head = NULL;
-    enum bool res = checkWholeMatrix(oldItem->r, X, Y, Z);
-    if(res == true){
-        addToList(&newLHead, &r);
-    }
-    int item = 0;
-    while(oldItem->next != NULL){
-        oldItem = oldItem->next;
-        enum bool res = checkWholeMatrix(oldItem->r, X, Y, Z);
-        if(res == true){
-            addToList(&newLHead, oldItem->r);
-            oldItem->r = NULL;
-        }
-        item++;
-    }
-
-
-    struct reactor *best = getBestReactor(&newLHead);
+    struct reactor *best = getBestReactor(&lHead);
     printReactor(best, X, Y, Z);
 
     t = clock() - t;
     cpu_time_used = ((double) t) / CLOCKS_PER_SEC;
     printf("Took %f seconds to execute \n", cpu_time_used);
-    free(matrix);
-    free(threads);
-    freeList(newLHead.head);
     freeList(lHead.head);
     return 0;
 }
