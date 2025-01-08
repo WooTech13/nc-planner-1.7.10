@@ -2,21 +2,18 @@
 ##  Makefile
 ##
 
-CFLAGS += -Wall -W -pipe -std=gnu99 -O3 -march=native -mtune=native -ffast-math -funroll-loops 
-CC ?= gcc
-DBFLAGS += -g -O0
 SRC_DIR = src
 BIN_DIR = bin
+INC_DIR = include
 
-all: clean planner planner-genAlgo
+CC      = gcc
+CFLAGS  =  -fPIC -Wall -W -pipe -std=gnu99 -O3 -march=native -mtune=native -ffast-math -funroll-loops
 
-clean:
-	rm -f bin/*
+all: clean main
 
-planner:
+main : 
+	$(CC) $(CFLAGS) -o main.bin $(SRC_DIR)/main.c $(SRC_DIR)/common.c $(SRC_DIR)/display.c $(SRC_DIR)/planner.c $(SRC_DIR)/plannerGA.c -I$(INC_DIR) -lm
+
+clean: 
+	rm -rRf $(BIN_DIR)/* main.bin
 	mkdir -p $(BIN_DIR)
-	${CC} ${CFLAGS} -o $(BIN_DIR)/planner.bin $(SRC_DIR)/planner.c
-
-planner-genAlgo:
-	mkdir -p $(BIN_DIR)
-	${CC} ${CFLAGS} -lm -o $(BIN_DIR)/planner-genAlgo.bin $(SRC_DIR)/planner-genAlgo.c
