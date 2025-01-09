@@ -126,6 +126,10 @@ int getAdjacentBlock(unsigned char *matrix, int x, int y, int z, blockType_t typ
 }
 
 void calculatePowerHeat(reactor_t *r, args_t *args){
+    r->totalPower = 0;
+    r->totalHeat = 0;
+    r->malus = 0;
+    
     for (int y = 0; y < args->Y; y++) {
         for (int z = 0; z < args->Z; z++) {
             for (int x = 0; x < args->X; x++) {
@@ -135,20 +139,25 @@ void calculatePowerHeat(reactor_t *r, args_t *args){
                             r->totalHeat = r->totalHeat - 160;
                         } else{
                             r->totalHeat = r->totalHeat - 80;
-                            r->totalPower = r->totalPower - 80;
+                            r->malus++;
                         }
                         break;
                     case CELL:
                         int adjCELL = getAdjacentBlock(r->matrix, x, y, z, CELL, args);
                         r->totalPower = r->totalPower + (adjCELL + 1) * r->basePower;
                         r->totalHeat = r->totalHeat + (((adjCELL+1) * (adjCELL + 2))/(double)2) * r->baseHeat;
+
+                        adjCELL = getAdjacentBlock(r->matrix, x, y, z, RED, args);
+                        if(adjCELL == 0){
+                            r->malus++;
+                        }
                         break;
                     case CRYO:
                         if(getAdjacentBlock(r->matrix, x, y, z, CRYO, args) == 0){
                             r->totalHeat = r->totalHeat - 160;
                         } else{
                             r->totalHeat = r->totalHeat - 80;
-                            r->totalPower = r->totalPower - 80;
+                            r->malus++;
                         }
                         break;
                     case HEL:

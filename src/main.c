@@ -30,7 +30,7 @@ void plannerGA(const int X, const  int Y, const int Z){
 
     const size_t populationSize = (size_t) 4 * MAX_VALUE * sqrt(X * Y * Z);
 
-    const size_t genMax = (size_t) 10 * sqrt(X * Y * Z);
+    const size_t genMax = (size_t) 50 * sqrt(X * Y * Z);
 
     args_t args = {X, Y, Z, populationSize, genMax, xSym, ySym, zSym };
     printf("%d, %d, %d, %zu, %zu, %d, %d, %d\n",args.X, args.Y, args.Z, args.populationSize, args.genMax, args.xSym, args.ySym, args.zSym);

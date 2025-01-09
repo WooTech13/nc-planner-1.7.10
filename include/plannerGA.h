@@ -16,7 +16,7 @@ bool getSym(char dim);
 
 void setSymBlock(uint8_t *matrix, int x, int y, int z, int val, args_t *args);
 
-void setFitness(reactor_t *r);
+void setFitness(reactor_t *r, args_t *args);
 
 reactor_t* initializeReactor(args_t *args);
 

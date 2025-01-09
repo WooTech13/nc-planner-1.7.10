@@ -37,6 +37,7 @@ typedef struct {
     double baseHeat;
     double totalPower;
     double totalHeat;
+    double malus;
     double fitness;
 } reactor_t ;
 

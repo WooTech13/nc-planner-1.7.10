@@ -43,8 +43,10 @@ void setSymBlock(uint8_t *matrix, int x, int y, int z, int val, args_t *args){
     }
 }
 
-void setFitness(reactor_t *r){
-    r->fitness =  (r->totalPower / r->totalHeat) * -1;
+void setFitness(reactor_t *r, args_t *args){
+    double totalBlock = args->X * args->Y * args->Z;
+    double malusRatio = 1 - (double)(r->malus / totalBlock);
+    r->fitness =  (r->totalPower / r->totalHeat) * -1 * malusRatio;
 }
 
 reactor_t* initializeReactor(args_t *args){
@@ -89,10 +91,9 @@ reactor_t* initializeReactor(args_t *args){
 
     r->basePower = 150;
     r->baseHeat = 25;
-    r->totalPower = 0;
-    r->totalHeat = 0;
+
     calculatePowerHeat(r, args);
-    setFitness(r);
+    setFitness(r, args);
     return r;
 }
 
@@ -103,11 +104,9 @@ reactor_t* initializeReactorFromMatrix(uint8_t *newMatrix, args_t *args){
     copyMatrix(newMatrix, r->matrix, args);
     r->basePower = 150;
     r->baseHeat = 25;
-    r->totalPower = 0;
-    r->totalHeat = 0;
 
     calculatePowerHeat(r, args);
-    setFitness(r);
+    setFitness(r, args);
     return r;
 }
 
@@ -115,10 +114,10 @@ void initializePopulation(listHead_t *population, args_t *args){
     size_t i = 0;
     while(i < args->populationSize){
         reactor_t *r = initializeReactor(args);
-        if(r->fitness > 0) {
+        //if(r->fitness > 0) {
             addToList(population, r);
             i++;
-        }        
+        //}        
     }
 }
 
@@ -149,8 +148,7 @@ double calculateAdaptiveMutationRate(double baseMutationRate, double diversity, 
 
 
 
-void mutate(reactor_t *r, double diversity, args_t *args){
-    double adaptiveMutationRate = MUTATION_RATE * (1.0 + (1.0 - diversity));
+void mutate(reactor_t *r, double adaptiveMutationRate, args_t *args){
     
     int xBound = args->X;
     if(args->xSym){
@@ -190,7 +188,7 @@ void mutate(reactor_t *r, double diversity, args_t *args){
         }
     }
     calculatePowerHeat(r, args);
-    setFitness(r);
+    setFitness(r, args);
 }
 
 void crossover(uint8_t *parent1, uint8_t *parent2, uint8_t *newMatrix1, uint8_t *newMatrix2, args_t *args) {

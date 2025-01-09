@@ -58,6 +58,7 @@ void printMatrix(uint8_t *matrix, args_t *args){
 void printReactor(reactor_t *r, args_t *args) {
     printMatrix(r->matrix, args);
     printf("With base power %f and base heat %f:\npower: %f\nheat: %f\n",r->basePower, r->baseHeat, r->totalPower, r->totalHeat);
+    printf("Malus: %f\n",r->malus);
     printf("\n");
     printTotalBlocks(r->matrix, args);
 }
