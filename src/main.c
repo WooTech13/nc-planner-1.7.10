@@ -28,19 +28,15 @@ void plannerGA(const int X, const  int Y, const int Z){
 
     const bool zSym = getSym('Z');
 
-    const size_t populationSize = (size_t) 4 * MAX_VALUE * sqrt(X * Y * Z);
+    const size_t populationSize = (size_t) 2 * MAX_VALUE * sqrt(X * Y * Z);
 
-    const size_t genMax = (size_t) 50 * sqrt(X * Y * Z);
+    const size_t genMax = (size_t) 5 * sqrt(X * Y * Z);
 
     args_t args = {X, Y, Z, populationSize, genMax, xSym, ySym, zSym };
-    printf("%d, %d, %d, %zu, %zu, %d, %d, %d\n",args.X, args.Y, args.Z, args.populationSize, args.genMax, args.xSym, args.ySym, args.zSym);
 
     unsigned int *randBuf = (unsigned int *) malloc(sizeof(unsigned int));
     getrandom(randBuf,sizeof(unsigned int),GRND_NONBLOCK);
     srand(*randBuf);
-
-    reactor_t *r = initializeReactor(&args);
-    printReactor(r, &args);
 
     listHead_t population;
     population.head = NULL;
@@ -48,12 +44,13 @@ void plannerGA(const int X, const  int Y, const int Z){
 
     initializePopulation(&population, &args);
 
-    listHead_t *newPopulation = runGA(&population, &args);
+    runGA(&population, &args);
 
-    reactor_t *best = getBestReactor(newPopulation);
+    reactor_t *best = getBestReactor(&population);
     printReactor(best, &args);
 
     freeList(&population);
+    free(randBuf);
 }
 
 int main(int argc, char *argv[]) {

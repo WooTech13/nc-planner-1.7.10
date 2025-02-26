@@ -11,7 +11,7 @@ bool getSym(char dim){
         printf("%c symetry [Y/n]:",dim);
         sym = getchar();
         if(sym == '\n'){
-            printf("Using sssymetry on %c\n",dim);
+            printf("Using symetry on %c\n",dim);
             return true;
         } else{
             flush();
@@ -97,16 +97,18 @@ reactor_t* initializeReactor(args_t *args){
     return r;
 }
 
-reactor_t* initializeReactorFromMatrix(uint8_t *newMatrix, args_t *args){
+reactor_t* copyReactor(reactor_t *oldReactor, args_t *args){
     reactor_t* r = (reactor_t*)malloc(sizeof(reactor_t));
 
     r->matrix = setMatrix(args);
-    copyMatrix(newMatrix, r->matrix, args);
-    r->basePower = 150;
-    r->baseHeat = 25;
+    copyMatrix(oldReactor->matrix, r->matrix, args);
+    r->basePower = oldReactor->basePower;
+    r->baseHeat = oldReactor->baseHeat;
+    r->totalPower = oldReactor->totalPower;
+    r->totalHeat = oldReactor->totalHeat;
+    r->fitness = oldReactor->fitness;
+    r->malus = oldReactor->malus;
 
-    calculatePowerHeat(r, args);
-    setFitness(r, args);
     return r;
 }
 
@@ -144,9 +146,6 @@ double calculateAdaptiveMutationRate(double baseMutationRate, double diversity, 
     double adaptiveFactor = exp(-normalizedDiversity);
     return baseMutationRate * (1.0 + adaptiveFactor);
 }
-
-
-
 
 void mutate(reactor_t *r, double adaptiveMutationRate, args_t *args){
     
@@ -244,6 +243,30 @@ void crossover(uint8_t *parent1, uint8_t *parent2, uint8_t *newMatrix1, uint8_t 
     }
 }
 
+reactor_t* getBestReactorsFromGen(listHead_t *population, listHead_t *newPopulation, listHead_t *bestReactors, int bestCount, args_t *args){
+    reactor_t *bestOfAll = population->head->r;
+
+    for(int i=1; i<=bestCount; i++){
+        listItem_t *lastBestItem = population->head;
+        double lastBestFitness = -RAND_MAX;
+        listItem_t *currentItem = population->head;
+        while(currentItem!=NULL){
+            if((currentItem->r->fitness > lastBestFitness) && (isInList(newPopulation, currentItem) == false)){                
+                lastBestItem = currentItem;
+                lastBestFitness = currentItem->r->fitness;
+            }
+            currentItem = currentItem->next;
+        }
+        reactor_t *bestCurrentReactor = copyReactor(lastBestItem->r, args);
+        addToList(newPopulation, bestCurrentReactor);
+        addToList(bestReactors, bestCurrentReactor);
+        if(i==1){
+            bestOfAll = lastBestItem->r;
+        }
+    }
+    return bestOfAll;
+}
+
 reactor_t* selectParentRoulette(listHead_t *population){
     double totalFitness = 0.0;
     listItem_t *item = population->head;
@@ -289,10 +312,10 @@ reactor_t* selectParentTournament(listHead_t *population, int tournamentSize, ar
     return best;
 }
 
-listHead_t* runGA(listHead_t *population, args_t *args){
+void runGA(listHead_t *population, args_t *args){
     listHead_t newPopulation;
     newPopulation.head = NULL;
-    const int elitismCount = 2;    
+    int bestCount = (int) sqrt(ELITE_RATIO * args->populationSize);    
     double maxDiversity = 0.0;
     for (size_t gen = 0; gen < args->genMax; gen++) {
         printf("\nGen %zu\n\n",gen);
@@ -303,48 +326,28 @@ listHead_t* runGA(listHead_t *population, args_t *args){
         
         double adaptiveMutationRate = calculateAdaptiveMutationRate(MUTATION_RATE, diversity, maxDiversity);
 
-        listItem_t *eliteItem = population->head;
-        reactor_t *bestItemReactor1 = NULL;
-        reactor_t *bestItemReactor2 = NULL;
-        double bestFitness1 = 0, bestFitness2 = 0;
-    
-        while(eliteItem != NULL) {
-            reactor_t *currentReactor = eliteItem->r;
-            if(currentReactor->fitness > bestFitness1) {
-                bestItemReactor2 = bestItemReactor1;
-                bestFitness2 = bestFitness1;
-                bestItemReactor1 = currentReactor;
-                bestFitness1 = currentReactor->fitness;
-            } else if(currentReactor->fitness > bestFitness2) {
-                bestItemReactor2 = currentReactor;
-                bestFitness2 = currentReactor->fitness;
-            }
-            eliteItem = eliteItem->next;
-        }
+        listHead_t bestReactors;
+        bestReactors.head = NULL;
+        reactor_t *bestReactor =  getBestReactorsFromGen(population, &newPopulation, &bestReactors, bestCount, args);
 
-
-        reactor_t *bestReactor1 = initializeReactorFromMatrix(bestItemReactor1->matrix, args);
-        reactor_t *bestReactor2 = initializeReactorFromMatrix(bestItemReactor2->matrix, args);
-        addToList(&newPopulation, bestReactor1);
-        addToList(&newPopulation, bestReactor2);
-
-        printf("best fitness of this generation = %f\n",bestReactor1->fitness);
+        printf("best fitness of this generation = %f\n",bestReactor->fitness);
         
-        for(size_t i = args->populationSize - elitismCount; i > 0;){
+        for(size_t i = args->populationSize - bestCount; i > 0;){
             if(((double) rand() / RAND_MAX < CROSSOVER_RATE) && (i!=1)){
-                //int tournamentSize = (int) args->populationSize * TOURNAMENT_SIZE_RATIO;
-                reactor_t *parent1 = /*selectParentTournament(population, tournamentSize, populationSize); //*/selectParentRoulette(population);
+                int tournamentSize = (int) args->populationSize * TOURNAMENT_SIZE_RATIO;
+                reactor_t *parent1 = selectParentTournament(population, tournamentSize, args); //selectParentRoulette(population);
                 reactor_t *parent2;
                 size_t j = 0;
                 do {
-                    parent2 = /*selectParentTournament(population, tournamentSize, populationSize); //*/selectParentRoulette(population);
+                    parent2 = selectParentTournament(population, tournamentSize, args); //selectParentRoulette(population);
                     j++;
                     
                 } while((parent2 == parent1) && (j != args->populationSize));
 
                 if(j==args->populationSize) {
-                    reactor_t *newReactor = initializeReactor(args);
-                    copyMatrix(bestReactor1->matrix, newReactor->matrix, args);
+                    int index = (int) rand() / bestCount;
+                    reactor_t *randBestReactor = getListItemFromIndex(&bestReactors, index);
+                    reactor_t *newReactor = copyReactor(randBestReactor, args);
                     
                     mutate(newReactor, adaptiveMutationRate, args);
 
@@ -352,23 +355,25 @@ listHead_t* runGA(listHead_t *population, args_t *args){
                     i--;
                 } else {
                     
-                    uint8_t *newMatrix1 = setMatrix(args);
-                    uint8_t *newMatrix2 = setMatrix(args);
-                    crossover(parent1->matrix, parent2->matrix, newMatrix1, newMatrix2, args);
+                    reactor_t *newReactor1 = initializeReactor(args);
+                    reactor_t *newReactor2 = initializeReactor(args);
+                    crossover(parent1->matrix, parent2->matrix, newReactor1->matrix, newReactor2->matrix, args);
+                    calculatePowerHeat(newReactor1, args);
+                    calculatePowerHeat(newReactor2, args);
+                    setFitness(newReactor1, args);
+                    setFitness(newReactor2, args);
+
                     
-                    reactor_t *newReactor1 = initializeReactorFromMatrix(newMatrix1,args);
-                    reactor_t *newReactor2 = initializeReactorFromMatrix(newMatrix2,args);
                     addToList(&newPopulation, newReactor1);
                     addToList(&newPopulation, newReactor2);
-                    free(newMatrix1);
-                    free(newMatrix2);
                     i-=2;
                 }
                 
             } else {
-                
-                reactor_t *newReactor = initializeReactor(args);
-                copyMatrix(bestReactor1->matrix, newReactor->matrix, args);
+                int index = (int) rand() % bestCount;
+                reactor_t *randBestReactor = getListItemFromIndex(&bestReactors, index);
+                reactor_t *newReactor = copyReactor(randBestReactor, args);
+
                 mutate(newReactor, adaptiveMutationRate, args);
 
                 addToList(&newPopulation, newReactor);
@@ -381,6 +386,4 @@ listHead_t* runGA(listHead_t *population, args_t *args){
         population->head = newPopulation.head;
         newPopulation.head = NULL; 
     }
-    
-    return population;
 }

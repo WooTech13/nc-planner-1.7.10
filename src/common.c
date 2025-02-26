@@ -100,6 +100,17 @@ void addToList(listHead_t *lHeadPtr, reactor_t *r){
     }
 }
 
+bool isInList(listHead_t *lHeadPtr, listItem_t *item){
+    listItem_t *current = lHeadPtr->head;
+    while(current != NULL){
+        if(current == item){
+            return true;
+        }
+        current = current->next;
+    }
+    return false;   
+}
+
 int getAdjacentBlock(unsigned char *matrix, int x, int y, int z, blockType_t type, args_t *args){
     int adj = 0;
 
@@ -162,6 +173,11 @@ void calculatePowerHeat(reactor_t *r, args_t *args){
                         break;
                     case HEL:
                         r->totalHeat = r->totalHeat - 125;
+                        adjCELL = getAdjacentBlock(r->matrix, x, y, z, CELL, args);
+                        int adjCRYO = getAdjacentBlock(r->matrix, x, y, z, CRYO, args);
+                        if((adjCELL > 0) && (adjCRYO == 0)){
+                            r->malus++;
+                        }
                         break;
                     default:
                         break;
@@ -185,7 +201,7 @@ void copyMatrix(uint8_t *matrixSrc, uint8_t *matrixDst, args_t *args){
 reactor_t* getBestReactor(listHead_t *lHeadPtr){
     listItem_t *item = lHeadPtr->head;
     reactor_t *best = item->r;
-    double bestPower = item->r->totalPower;
+    double bestPower = -RAND_MAX;
     while(item != NULL){
         if(item->r->totalHeat <= 0){
             double curFitness = item->r->fitness;

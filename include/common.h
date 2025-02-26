@@ -64,6 +64,8 @@ reactor_t* popListFromValue(listHead_t *head, reactor_t *r);
 
 void addToList(listHead_t *lHeadPtr, reactor_t *r);
 
+bool isInList(listHead_t *lHeadPtr, listItem_t *item);
+
 int getAdjacentBlock(unsigned char *matrix, int x, int y, int z, blockType_t type, args_t *args);
 
 void calculatePowerHeat(reactor_t *r, args_t *args);

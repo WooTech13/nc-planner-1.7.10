@@ -5,10 +5,10 @@
 
 
 
-#define MUTATION_RATE 0.5
+#define MUTATION_RATE 0.2
 #define CROSSOVER_RATE 0.8
-#define ELITE_RATIO 0.01
-#define TOURNAMENT_SIZE_RATIO 0.03
+#define ELITE_RATIO 0.1
+#define TOURNAMENT_SIZE_RATIO 0.1
 
 void flush();
 
@@ -32,10 +32,12 @@ void mutate(reactor_t *r, double diversity, args_t *args);
 
 void crossover(uint8_t *parent1, uint8_t *parent2, uint8_t *newMatrix1, uint8_t *newMatrix2, args_t *args);
 
+reactor_t* getBestReactorsFromGen(listHead_t *population, listHead_t *newPopulation, listHead_t *bestReactors, int bestCount, args_t *args);
+
 reactor_t* selectParentRoulette(listHead_t *population);
 
 reactor_t* selectParentTournament(listHead_t *population, int tournamentSize, args_t *args);
 
-listHead_t* runGA(listHead_t *population, args_t *args);
+void runGA(listHead_t *population, args_t *args);
 
 #endif
