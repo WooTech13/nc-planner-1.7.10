@@ -3,22 +3,22 @@
 const char print[] = {'R','C','#','H','x'};
 
 void printTotalBlocks(uint8_t *matrix, args_t *args){
-    int cRED = 0, cCRYO = 0, cCELL = 0, cHEL = 0;
+    int count_REDSTONE = 0, count_CRYOTHEUM = 0, count_FUEL_CELL = 0, count_LIQUID_HELIUM = 0;
     for (int y = 0; y < args->Y; y++) {
         for (int z = 0; z < args->Z; z++) {
             for (int x = 0; x < args->X; x++) {
                 switch (matrix[OFFSET(x, y, z, args->Y, args->Z)]) {
-                    case RED:
-                        cRED++;
+                    case REDSTONE:
+                        count_REDSTONE++;
                         break;
-                    case CELL:
-                        cCELL++;
+                    case FUEL_CELL:
+                        count_FUEL_CELL++;
                         break;
-                    case CRYO:
-                        cCRYO++;
+                    case GELID_CRYOTHEUM:
+                        count_CRYOTHEUM++;
                         break;
-                    case HEL:
-                        cHEL++;
+                    case LIQUID_HELIUM:
+                        count_LIQUID_HELIUM++;
                         break;
                     default:
                         break;
@@ -33,13 +33,13 @@ void printTotalBlocks(uint8_t *matrix, args_t *args){
     printf("\n");
     printf("Casing: %d",2*(args->X * args->Y + args->X * args->Z + args->Y * args->Z));
     printf("\n");
-    printf("Redstone cooler: %d",cRED);
+    printf("Redstone cooler: %d",count_REDSTONE);
     printf("\n");
-    printf("Cryotheum cooler: %d",cCRYO);
+    printf("GELID_CRYOTHEUM cooler: %d",count_CRYOTHEUM);
     printf("\n");
-    printf("Reactor cell: %d",cCELL);
+    printf("Reactor FUEL_CELL: %d",count_FUEL_CELL);
     printf("\n");
-    printf("Helium cooler: %d",cHEL);
+    printf("Helium cooler: %d",count_LIQUID_HELIUM);
     printf("\n"); 
 }
 

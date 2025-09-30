@@ -5,13 +5,13 @@ int checkWholeMatrix(reactor_t *r, args_t *args){
         for (int z = 0; z < args->Z; z++) {
             for (int x = 0; x < args->X; x++) {
                 switch (r->matrix[OFFSET(x, y, z, args->Y, args->Z)]) {
-                    case RED:
-                        if(getAdjacentBlock(r->matrix, x, y, z, CELL, args) == 0) return 0;
-                    case CELL:
+                    case REDSTONE:
+                        if(getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args) == 0) return 0;
+                    case FUEL_CELL:
                         continue;
-                    case CRYO:
-                        if(getAdjacentBlock(r->matrix, x, y, z, CRYO, args) > 0) return 0;
-                    case HEL:
+                    case GELID_CRYOTHEUM:
+                        if(getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args) > 0) return 0;
+                    case LIQUID_HELIUM:
                         continue;
                     default:
                         return 0;
@@ -30,11 +30,11 @@ int checkWholeMatrix(reactor_t *r, args_t *args){
 
 int incrementMatrix(uint8_t *matrix, size_t total_size){
     for (size_t i = 0; i < total_size; i++) {
-        if (matrix[i] < HEL) {
+        if (matrix[i] < LIQUID_HELIUM) {
             matrix[i]++;
             return 1;
         }
-        matrix[i] = RED;
+        matrix[i] = REDSTONE;
     }
     return 0;
 }

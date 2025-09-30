@@ -4,4 +4,8 @@ planner-genAlgo: Use a genetic algorithm to improve a population initialized fro
 
 How to build: make all
 
-How to run: <./bin/planner.bin or ./bin/planner-genAlgo.bin> <X size> <Y size> <Z size>
+How to run: ```main <X size> <Y size> <Z size>```
+
+then select [1] or [2] for either :
+- 1, or combination : explore all the combination possibilities
+- 2, or genetic algorithm generation : explore random reactor generation and try to improve them over multiple generations. In this mode, you can choose to generate an X, Y and/or Z symetric reactor (for easier build for example)

@@ -3,7 +3,7 @@
 
 uint8_t* setMatrix(args_t *args){
     uint8_t *matrix = (uint8_t *) malloc(args->X * args->Y * args->Z * sizeof(uint8_t));
-    memset(matrix, RED, args->X * args->Y * args->Z * sizeof(uint8_t));
+    memset(matrix, REDSTONE, args->X * args->Y * args->Z * sizeof(uint8_t));
     
     return matrix;
 }
@@ -145,36 +145,36 @@ void calculatePowerHeat(reactor_t *r, args_t *args){
         for (int z = 0; z < args->Z; z++) {
             for (int x = 0; x < args->X; x++) {
                 switch (r->matrix[OFFSET(x, y, z, args->Y, args->Z)]) {
-                    case RED:
-                        if(getAdjacentBlock(r->matrix, x, y, z, CELL, args) != 0){
+                    case REDSTONE:
+                        if(getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args) != 0){
                             r->totalHeat = r->totalHeat - 160;
                         } else{
                             r->totalHeat = r->totalHeat - 80;
                             r->malus++;
                         }
                         break;
-                    case CELL:
-                        int adjCELL = getAdjacentBlock(r->matrix, x, y, z, CELL, args);
+                    case FUEL_CELL:
+                        int adjCELL = getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args);
                         r->totalPower = r->totalPower + (adjCELL + 1) * r->basePower;
                         r->totalHeat = r->totalHeat + (((adjCELL+1) * (adjCELL + 2))/(double)2) * r->baseHeat;
 
-                        adjCELL = getAdjacentBlock(r->matrix, x, y, z, RED, args);
+                        adjCELL = getAdjacentBlock(r->matrix, x, y, z, REDSTONE, args);
                         if(adjCELL == 0){
                             r->malus++;
                         }
                         break;
-                    case CRYO:
-                        if(getAdjacentBlock(r->matrix, x, y, z, CRYO, args) == 0){
+                    case GELID_CRYOTHEUM:
+                        if(getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args) == 0){
                             r->totalHeat = r->totalHeat - 160;
                         } else{
                             r->totalHeat = r->totalHeat - 80;
                             r->malus++;
                         }
                         break;
-                    case HEL:
+                    case LIQUID_HELIUM:
                         r->totalHeat = r->totalHeat - 125;
-                        adjCELL = getAdjacentBlock(r->matrix, x, y, z, CELL, args);
-                        int adjCRYO = getAdjacentBlock(r->matrix, x, y, z, CRYO, args);
+                        adjCELL = getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args);
+                        int adjCRYO = getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args);
                         if((adjCELL > 0) && (adjCRYO == 0)){
                             r->malus++;
                         }

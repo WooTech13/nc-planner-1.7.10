@@ -7,16 +7,16 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#define MAX_VALUE HEL
+#define MAX_VALUE LIQUID_HELIUM
 
 #define OFFSET(x, y, z, Y, Z) ((x) * (Y * Z) + (y) * Z + (z))
 
 typedef enum {
-    RED,
-    CRYO,
-    CELL,
-    HEL,
-    DEF,
+    REDSTONE,
+    GELID_CRYOTHEUM,
+    FUEL_CELL,
+    LIQUID_HELIUM,
+    DEFAULT,
 } blockType_t;
 
 

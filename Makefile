@@ -13,11 +13,11 @@ DBFLAGS = -Wall -W -pipe -std=gnu99 -g -O0
 all: clean main
 
 debug: clean
-	$(CC) $(DBFLAGS) -o main.bin $(SRC_DIR)/main.c $(SRC_DIR)/common.c $(SRC_DIR)/display.c $(SRC_DIR)/planner.c $(SRC_DIR)/plannerGA.c -I$(INC_DIR) -lm
+	$(CC) $(DBFLAGS) -o main $(SRC_DIR)/main.c $(SRC_DIR)/common.c $(SRC_DIR)/display.c $(SRC_DIR)/planner.c $(SRC_DIR)/plannerGA.c -I$(INC_DIR) -lm
 
 main : 
-	$(CC) $(CFLAGS) -o main.bin $(SRC_DIR)/main.c $(SRC_DIR)/common.c $(SRC_DIR)/display.c $(SRC_DIR)/planner.c $(SRC_DIR)/plannerGA.c -I$(INC_DIR) -lm
+	$(CC) $(CFLAGS) -o main $(SRC_DIR)/main.c $(SRC_DIR)/common.c $(SRC_DIR)/display.c $(SRC_DIR)/planner.c $(SRC_DIR)/plannerGA.c -I$(INC_DIR) -lm
 
 clean: 
-	rm -rRf $(BIN_DIR)/* main.bin
+	rm -rRf $(BIN_DIR)/* main
 	mkdir -p $(BIN_DIR)
