@@ -18,6 +18,8 @@ void setSymBlock(uint8_t *matrix, int x, int y, int z, int val, args_t *args);
 
 void setFitness(reactor_t *r, args_t *args);
 
+void fineTunePopulation(listHead_t *population, args_t *args);
+
 reactor_t* initializeReactor(args_t *args);
 
 reactor_t* initializeReactorFromMatrix(uint8_t *newMatrix, args_t *args);
@@ -32,7 +34,7 @@ void mutate(reactor_t *r, double diversity, args_t *args);
 
 void crossover(uint8_t *parent1, uint8_t *parent2, uint8_t *newMatrix1, uint8_t *newMatrix2, args_t *args);
 
-reactor_t* getBestReactorsFromGen(listHead_t *population, listHead_t *newPopulation, listHead_t *bestReactors, int bestCount, args_t *args);
+reactor_t* getBestReactorsFromGen(listHead_t *population, listHead_t *newPopulation, int bestCount, args_t *args);
 
 reactor_t* selectParentRoulette(listHead_t *population);
 

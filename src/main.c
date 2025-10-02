@@ -38,6 +38,14 @@ void plannerGA(const int X, const  int Y, const int Z){
     getrandom(randBuf,sizeof(unsigned int),GRND_NONBLOCK);
     srand(*randBuf);
 
+    /*reactor_t *r = initializeReactor(&args);
+    printReactor(r, &args);
+
+    fixFitness(r, &args);
+
+    printReactor(r, &args);
+    */
+    
     listHead_t population;
     population.head = NULL;
     
