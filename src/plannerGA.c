@@ -1,4 +1,5 @@
 #include "../include/plannerGA.h"
+#include <stddef.h>
 
 void flush(){
     int c;
@@ -45,66 +46,76 @@ void setSymBlock(uint8_t *matrix, int x, int y, int z, int val, args_t *args){
 
 void setFitness(reactor_t *r, args_t *args){
     double totalBlock = args->X * args->Y * args->Z;
-    double malusRatio = 1 - (double)(r->malus / totalBlock);
-    r->fitness =  (r->totalPower / r->totalHeat) * -1 * malusRatio;
+    double malusRatio = (double)(r->malus / totalBlock);
+    
+    if(malusRatio == 0) {
+        r->fitness =  (r->totalPower / r->totalHeat) * -1;
+    } else {
+        r->fitness =  ((r->totalPower / r->totalHeat) * -1) / malusRatio;
+    }
+    //printf("Malus : %f, malus ratio : %f, fitness : %f\n", malusRatio, r->malus, r->fitness);
+}
+
+void fineTuneReactor(reactor_t *r, args_t *args) {
+    for (int y = 0; y < args->Y; y++) {
+        for (int z = 0; z < args->Z; z++) {
+            for (int x = 0; x < args->X; x++) {
+                uint8_t *current_block = &r->matrix[OFFSET(x, y, z, args->Y, args->Z)];
+                switch (*current_block) {
+                    case REDSTONE:
+                        if(getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args) == 0){
+                            if(r->totalHeat >= 0){
+                                if(getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args) == 0) {
+                                    *current_block = GELID_CRYOTHEUM;
+                                } else {
+                                    *current_block = LIQUID_HELIUM;
+                                }
+                            } else {
+                                *current_block = FUEL_CELL;
+                            }
+                        }
+                        break;
+                    case FUEL_CELL:
+                        break;
+                    case GELID_CRYOTHEUM:
+                        if(getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args) != 0){
+                        if(r->totalHeat >= 0){
+                                if(getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args) != 0) {
+                                    *current_block = REDSTONE;
+                                } else {
+                                    *current_block = LIQUID_HELIUM;
+                                }
+                            } else {
+                                *current_block = FUEL_CELL;
+                            }
+                        }
+                        break;
+                    case LIQUID_HELIUM:
+                        if(r->totalHeat >= 0){
+                            if(getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args) != 0) {
+                                *current_block = REDSTONE;
+                            } else if(getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args) == 0) {
+                                *current_block = GELID_CRYOTHEUM;
+                            }
+                        } else {
+                            *current_block = FUEL_CELL;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                calculatePowerHeat(r, args);
+                setFitness(r, args);
+            }
+        }
+    }
 }
 
 void fineTunePopulation(listHead_t *population, args_t *args) {
     listItem_t *item = population->head;
     while(item != NULL) {
         reactor_t *r = item->r;
-
-        for (int y = 0; y < args->Y; y++) {
-            for (int z = 0; z < args->Z; z++) {
-                for (int x = 0; x < args->X; x++) {
-                    uint8_t *current_block = &r->matrix[OFFSET(x, y, z, args->Y, args->Z)];
-                    switch (*current_block) {
-                        case REDSTONE:
-                            if(getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args) == 0){
-                                if(r->totalHeat >= 0){
-                                    if(getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args) == 0) {
-                                        *current_block = GELID_CRYOTHEUM;
-                                    } else {
-                                        *current_block = LIQUID_HELIUM;
-                                    }
-                                } else {
-                                    *current_block = FUEL_CELL;
-                                }
-                            }
-                            break;
-                        case FUEL_CELL:
-                            break;
-                        case GELID_CRYOTHEUM:
-                            if(getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args) != 0){
-                            if(r->totalHeat >= 0){
-                                    if(getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args) != 0) {
-                                        *current_block = REDSTONE;
-                                    } else {
-                                        *current_block = LIQUID_HELIUM;
-                                    }
-                                } else {
-                                    *current_block = FUEL_CELL;
-                                }
-                            }
-                            break;
-                        case LIQUID_HELIUM:
-                            if(r->totalHeat >= 0){
-                                if(getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args) != 0) {
-                                    *current_block = REDSTONE;
-                                } else if(getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args) == 0) {
-                                    *current_block = GELID_CRYOTHEUM;
-                                }
-                            } else {
-                                *current_block = FUEL_CELL;
-                            }
-                            break;
-                        default:
-                            break;
-                    }
-                    calculatePowerHeat(r, args);
-                }
-            }
-        }
+        fineTuneReactor(r, args);
         item = item->next;
     }
 }
@@ -319,6 +330,11 @@ reactor_t* getBestReactorsFromGen(listHead_t *population, listHead_t *newPopulat
         }
         reactor_t *bestCurrentReactor = copyReactor(lastBestItem->r, args);
         addToList(newPopulation, bestCurrentReactor);
+
+        reactor_t *bestFineTunedReactor = copyReactor(bestCurrentReactor, args);
+        fineTuneReactor(bestFineTunedReactor, args);
+        addToList(newPopulation, bestFineTunedReactor);
+
         if(i==1){
             bestOfAll = lastBestItem->r;
         }
@@ -385,11 +401,12 @@ void runGA(listHead_t *population, args_t *args){
         
         double adaptiveMutationRate = calculateAdaptiveMutationRate(MUTATION_RATE, diversity, maxDiversity);
 
+
         reactor_t *bestReactor =  getBestReactorsFromGen(population, &newPopulation, bestCount, args);
 
         printf("best fitness of this generation = %f\n",bestReactor->fitness);
         
-        for(size_t i = args->populationSize - bestCount; i > 0;){
+        for(size_t i = args->populationSize - (bestCount * 2); i > 0;){
             if(((double) rand() / RAND_MAX < CROSSOVER_RATE) && (i!=1)){
                 int tournamentSize = (int) args->populationSize * TOURNAMENT_SIZE_RATIO;
                 reactor_t *parent1 = selectParentTournament(population, tournamentSize, args); //selectParentRoulette(population);
@@ -405,9 +422,9 @@ void runGA(listHead_t *population, args_t *args){
                     int index = (int) rand() / bestCount;
                     reactor_t *randBestReactor = getListItemFromIndex(&newPopulation, index);
                     reactor_t *newReactor = copyReactor(randBestReactor, args);
-                    
+                    fineTuneReactor(newReactor, args);
                     mutate(newReactor, adaptiveMutationRate, args);
-
+                        
                     addToList(&newPopulation, newReactor);
                     i--;
                 } else {
@@ -432,7 +449,7 @@ void runGA(listHead_t *population, args_t *args){
                 reactor_t *newReactor = copyReactor(randBestReactor, args);
 
                 mutate(newReactor, adaptiveMutationRate, args);
-
+                fineTuneReactor(newReactor, args);
                 addToList(&newPopulation, newReactor);
                 i--;
             }
@@ -440,7 +457,7 @@ void runGA(listHead_t *population, args_t *args){
         }
         freeList(population);
         population->head = newPopulation.head;
-        fineTunePopulation(population, args);
+        
         newPopulation.head = NULL; 
     }
 }

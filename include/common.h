@@ -60,6 +60,8 @@ int listLen(listHead_t *head);
 
 reactor_t* getListItemFromIndex(listHead_t *head, int index);
 
+reactor_t* popLastFromList(listHead_t *head);
+
 reactor_t* popListFromValue(listHead_t *head, reactor_t *r);
 
 void addToList(listHead_t *lHeadPtr, reactor_t *r);

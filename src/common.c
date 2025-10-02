@@ -58,6 +58,16 @@ reactor_t* getListItemFromIndex(listHead_t *head, int index){
     return NULL;
 }
 
+reactor_t* popLastFromList(listHead_t *head){
+    listItem_t *del;
+    reactor_t *ret;
+    del = head->head;
+    head->head = del->next;
+    ret = del->r;
+    free(del);
+    return ret;
+}
+
 reactor_t* popListFromValue(listHead_t *head, reactor_t *r){
     listItem_t *del;
     reactor_t *ret;
@@ -141,6 +151,7 @@ void calculatePowerHeat(reactor_t *r, args_t *args){
     r->totalHeat = 0;
     r->malus = 0;
     
+    int adjFUEL_CELL;
     for (int y = 0; y < args->Y; y++) {
         for (int z = 0; z < args->Z; z++) {
             for (int x = 0; x < args->X; x++) {
@@ -154,12 +165,12 @@ void calculatePowerHeat(reactor_t *r, args_t *args){
                         }
                         break;
                     case FUEL_CELL:
-                        int adjCELL = getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args);
-                        r->totalPower = r->totalPower + (adjCELL + 1) * r->basePower;
-                        r->totalHeat = r->totalHeat + (((adjCELL+1) * (adjCELL + 2))/(double)2) * r->baseHeat;
+                        adjFUEL_CELL = getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args);
+                        r->totalPower = r->totalPower + (adjFUEL_CELL + 1) * r->basePower;
+                        r->totalHeat = r->totalHeat + (((adjFUEL_CELL+1) * (adjFUEL_CELL + 2))/(double)2) * r->baseHeat;
 
-                        adjCELL = getAdjacentBlock(r->matrix, x, y, z, REDSTONE, args);
-                        if(adjCELL == 0){
+                        adjFUEL_CELL = getAdjacentBlock(r->matrix, x, y, z, REDSTONE, args);
+                        if(adjFUEL_CELL == 0){
                             r->malus++;
                         }
                         break;
@@ -173,9 +184,9 @@ void calculatePowerHeat(reactor_t *r, args_t *args){
                         break;
                     case LIQUID_HELIUM:
                         r->totalHeat = r->totalHeat - 125;
-                        adjCELL = getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args);
-                        int adjCRYO = getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args);
-                        if((adjCELL > 0) && (adjCRYO == 0)){
+                        adjFUEL_CELL = getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args);
+                        int adjGELID_CRYOTHEUM = getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args);
+                        if((adjFUEL_CELL > 0) || (adjGELID_CRYOTHEUM == 0)){
                             r->malus++;
                         }
                         break;
@@ -201,13 +212,13 @@ void copyMatrix(uint8_t *matrixSrc, uint8_t *matrixDst, args_t *args){
 reactor_t* getBestReactor(listHead_t *lHeadPtr){
     listItem_t *item = lHeadPtr->head;
     reactor_t *best = item->r;
-    double bestPower = -RAND_MAX;
+    double bestFitness = -RAND_MAX;
     while(item != NULL){
         if(item->r->totalHeat <= 0){
             double curFitness = item->r->fitness;
-            if(curFitness >= bestPower){
+            if(curFitness >= bestFitness){
                 best = item->r;
-                bestPower = curFitness;
+                bestFitness = curFitness;
             }
         }
         item = item->next;
