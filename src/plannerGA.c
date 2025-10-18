@@ -60,18 +60,17 @@ void fineTuneReactor(reactor_t *r, args_t *args) {
     for (int y = 0; y < args->Y; y++) {
         for (int z = 0; z < args->Z; z++) {
             for (int x = 0; x < args->X; x++) {
-                uint8_t *current_block = &r->matrix[OFFSET(x, y, z, args->Y, args->Z)];
-                switch (*current_block) {
+                switch (r->matrix[OFFSET(x, y, z, args->Y, args->Z)]) {
                     case REDSTONE:
                         if(getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args) == 0){
                             if(r->totalHeat >= 0){
                                 if(getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args) == 0) {
-                                    *current_block = GELID_CRYOTHEUM;
+                                    setSymBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args);
                                 } else {
-                                    *current_block = LIQUID_HELIUM;
+                                    setSymBlock(r->matrix, x, y, z, LIQUID_HELIUM, args);
                                 }
                             } else {
-                                *current_block = FUEL_CELL;
+                                setSymBlock(r->matrix, x, y, z, FUEL_CELL, args);
                             }
                         }
                         break;
@@ -81,24 +80,24 @@ void fineTuneReactor(reactor_t *r, args_t *args) {
                         if(getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args) != 0){
                         if(r->totalHeat >= 0){
                                 if(getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args) != 0) {
-                                    *current_block = REDSTONE;
+                                    setSymBlock(r->matrix, x, y, z, REDSTONE, args);
                                 } else {
-                                    *current_block = LIQUID_HELIUM;
+                                    setSymBlock(r->matrix, x, y, z, LIQUID_HELIUM, args);
                                 }
                             } else {
-                                *current_block = FUEL_CELL;
+                                setSymBlock(r->matrix, x, y, z, FUEL_CELL, args);
                             }
                         }
                         break;
                     case LIQUID_HELIUM:
                         if(r->totalHeat >= 0){
                             if(getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args) != 0) {
-                                *current_block = REDSTONE;
+                                setSymBlock(r->matrix, x, y, z, REDSTONE, args);
                             } else if(getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args) == 0) {
-                                *current_block = GELID_CRYOTHEUM;
+                                setSymBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args);
                             }
                         } else {
-                            *current_block = FUEL_CELL;
+                            setSymBlock(r->matrix, x, y, z, FUEL_CELL, args);
                         }
                         break;
                     default:
