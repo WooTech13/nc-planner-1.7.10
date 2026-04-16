@@ -26,12 +26,14 @@
 #endif
 
 /* ─── Types de blocs ─────────────────────────────────────────────────── */
+/* AIR, STANDARD et WATER retirés :
+ *   - Le réacteur est supposé toujours plein (pas de case vide)
+ *   - STANDARD : refroidissement trop faible (30-60) pour justifier une case
+ *   - WATER     : refroidissement identique à STANDARD, condition bord triviale
+ *   => 7 types restants, espace de recherche réduit de ~30%               */
 typedef enum {
-    AIR = 0,
-    FUEL_CELL,
+    FUEL_CELL = 0,
     GRAPHITE,
-    STANDARD,
-    WATER,
     GELID_CRYOTHEUM,
     ENDERIUM,
     GLOWSTONE,
@@ -41,8 +43,8 @@ typedef enum {
 } BlockType;
 
 static const char *BLOCK_NAMES[] = {
-    "AIR", "FUEL_CELL", "GRAPHITE", "STANDARD", "WATER",
-    "GELID_CRYOTHEUM", "ENDERIUM", "GLOWSTONE", "LIQUID_HELIUM", "REDSTONE"
+    "FUEL_CELL", "GRAPHITE", "GELID_CRYOTHEUM",
+    "ENDERIUM", "GLOWSTONE", "LIQUID_HELIUM", "REDSTONE"
 };
 
 /* ─── Paramètres de l'algorithme ─────────────────────────────────────── */
@@ -112,18 +114,6 @@ static int count_adjacent(const BlockType *grid, int cx, int cy, int cz, BlockTy
     return count;
 }
 
-/* Vérifie si (cx,cy,cz) est adjacent à une CASE (bord du réacteur) */
-static int adjacent_to_case(int cx, int cy, int cz) {
-    /* Un bloc est adjacent à une CASE si l'un de ses voisins est hors-grille */
-    for (int d = 0; d < 6; d++) {
-        int nx = cx + DX[d];
-        int ny = cy + DY[d];
-        int nz = cz + DZ[d];
-        if (!in_bounds(nx, ny, nz)) return 1;
-    }
-    return 0;
-}
-
 static void evaluate(Reactor *r) {
     const BlockType *g = r->grid;
     double total_energy = 0.0;
@@ -141,21 +131,17 @@ static void evaluate(Reactor *r) {
         BlockType b = g[IDX(x,y,z)];
         int adj_fuel    = count_adjacent(g, x,y,z, FUEL_CELL);
         int adj_graphite= count_adjacent(g, x,y,z, GRAPHITE);
-        int adj_standard= count_adjacent(g, x,y,z, STANDARD);
         int adj_gelid   = count_adjacent(g, x,y,z, GELID_CRYOTHEUM);
 
         switch (b) {
         case FUEL_CELL: {
-            /* Énergie : (adjFC+1)*base_power */
             double e = (adj_fuel + 1.0) * BASE_POWER;
-            /* Chaleur  : ((adjFC+1)*(adjFC+2)/2)*base_heat */
             double h = ((adj_fuel + 1.0) * (adj_fuel + 2.0) / 2.0) * BASE_HEAT;
             total_energy += e;
             total_heat   += h;
             break;
         }
         case GRAPHITE: {
-            /* Produit seulement si adjacent à au moins 1 FUEL_CELL */
             if (adj_fuel > 0) {
                 double c = (double)num_fuel_cells;
                 total_energy += c * BASE_POWER / 10.0;
@@ -163,32 +149,17 @@ static void evaluate(Reactor *r) {
             }
             break;
         }
-        case STANDARD: {
-            /* Réduit chaleur : 60 si ≥1 STANDARD adjacent, 30 sinon */
-            double cooling = (adj_standard >= 1) ? 60.0 : 30.0;
-            total_heat -= cooling;
-            break;
-        }
-        case WATER: {
-            /* Réduit chaleur : 60 si ≥1 CASE adjacent, 30 sinon */
-            double cooling = adjacent_to_case(x,y,z) ? 60.0 : 30.0;
-            total_heat -= cooling;
-            break;
-        }
         case GELID_CRYOTHEUM: {
-            /* Réduit chaleur : 160 si aucun GELID_CRYOTHEUM adjacent, 80 sinon */
             double cooling = (adj_gelid == 0) ? 160.0 : 80.0;
             total_heat -= cooling;
             break;
         }
         case ENDERIUM: {
-            /* Réduit chaleur : 160 si ≥1 GRAPHITE adjacent, 80 sinon */
             double cooling = (adj_graphite >= 1) ? 160.0 : 80.0;
             total_heat -= cooling;
             break;
         }
         case GLOWSTONE: {
-            /* Réduit chaleur : 320 si 1 GRAPHITE sur chaque côté (6), 80 sinon */
             double cooling = (adj_graphite == 6) ? 320.0 : 80.0;
             total_heat -= cooling;
             break;
@@ -198,7 +169,6 @@ static void evaluate(Reactor *r) {
             break;
         }
         case REDSTONE: {
-            /* Réduit chaleur : 160 si ≥1 FUEL_CELL adjacent, 80 sinon */
             double cooling = (adj_fuel >= 1) ? 160.0 : 80.0;
             total_heat -= cooling;
             break;
@@ -269,17 +239,16 @@ static inline int tl_randi(int tid, int n) {
  * ═══════════════════════════════════════════════════════════════════════ */
 
 /* Probabilités de tirage par type de bloc (heuristique domain-specific) */
+/* Pas d'AIR : le réacteur est toujours plein.
+ * Pas de STANDARD/WATER : refroidissement trop faible, retirés de l'espace. */
 static const double BLOCK_PROBS[NUM_BLOCK_TYPES] = {
-    0.10,  /* AIR            - espace vide */
-    0.18,  /* FUEL_CELL      - cœur du réacteur */
-    0.10,  /* GRAPHITE       - boosteur */
-    0.10,  /* STANDARD       - refroidisseur basique */
-    0.10,  /* WATER          - refroidisseur bord */
-    0.12,  /* GELID_CRYOTHEUM*/
-    0.08,  /* ENDERIUM       */
-    0.06,  /* GLOWSTONE      */
-    0.08,  /* LIQUID_HELIUM  */
-    0.08,  /* REDSTONE       */
+    0.25,  /* FUEL_CELL      - cœur du réacteur, favorisé */
+    0.12,  /* GRAPHITE       - boosteur d'énergie */
+    0.18,  /* GELID_CRYOTHEUM- meilleur refroidisseur isolé */
+    0.12,  /* ENDERIUM       - bon si près graphite */
+    0.08,  /* GLOWSTONE      - très puissant mais rare (besoin 6 graphites) */
+    0.13,  /* LIQUID_HELIUM  - refroidissement constant, fiable */
+    0.12,  /* REDSTONE       - bon si près fuel cell */
 };
 
 static BlockType random_block(int tid) {
@@ -289,7 +258,7 @@ static BlockType random_block(int tid) {
         cum += BLOCK_PROBS[i];
         if (r < cum) return (BlockType)i;
     }
-    return AIR;
+    return FUEL_CELL;
 }
 
 static void randomize(Reactor *r, int tid) {
@@ -300,7 +269,7 @@ static void randomize(Reactor *r, int tid) {
 
 /* Graine heuristique : FUEL_CELL entouré de refroidisseurs */
 static void seed_heuristic(Reactor *r, int tid) {
-    /* Commence avec tous GELID_CRYOTHEUM */
+    /* Commence avec tous GELID_CRYOTHEUM (meilleur refroidisseur de base) */
     for (int i = 0; i < GSIZE; i++)
         r->grid[i] = GELID_CRYOTHEUM;
 
@@ -313,7 +282,7 @@ static void seed_heuristic(Reactor *r, int tid) {
             r->grid[IDX(x,y,z)] = FUEL_CELL;
     }
 
-    /* Ajoute quelques GRAPHITE proches des FUEL_CELL */
+    /* Ajoute des GRAPHITE proches des FUEL_CELL */
     for (int z = 0; z < GZ; z++)
     for (int y = 0; y < GY; y++)
     for (int x = 0; x < GX; x++) {
@@ -321,6 +290,16 @@ static void seed_heuristic(Reactor *r, int tid) {
             if (count_adjacent(r->grid, x,y,z, FUEL_CELL) > 0 && tl_randf(tid) < 0.3)
                 r->grid[IDX(x,y,z)] = GRAPHITE;
         }
+    }
+
+    /* Quelques REDSTONE près des FUEL_CELL restants */
+    for (int z = 0; z < GZ; z++)
+    for (int y = 0; y < GY; y++)
+    for (int x = 0; x < GX; x++) {
+        int idx = IDX(x,y,z);
+        if (r->grid[idx] == GELID_CRYOTHEUM &&
+            count_adjacent(r->grid, x,y,z, FUEL_CELL) > 0 && tl_randf(tid) < 0.25)
+            r->grid[idx] = REDSTONE;
     }
     evaluate(r);
 }
@@ -382,11 +361,14 @@ static void mutate_targeted(Reactor *r, double rate, int tid) {
             }
         }
     } else {
-        /* Essaie d'ajouter des FUEL_CELL si on a de la marge thermique */
+        /* Marge thermique disponible : favorise FUEL_CELL et GRAPHITE */
         for (int i = 0; i < GSIZE; i++) {
-            if (r->grid[i] == AIR && tl_randf(tid) < rate * 0.5)
+            double rnd = tl_randf(tid);
+            if (rnd < rate * 0.4)
                 r->grid[i] = FUEL_CELL;
-            else if (tl_randf(tid) < rate * 0.3)
+            else if (rnd < rate * 0.6)
+                r->grid[i] = GRAPHITE;
+            else if (rnd < rate)
                 r->grid[i] = random_block(tid);
         }
     }
@@ -470,8 +452,8 @@ static void print_reactor(const Reactor *r) {
             printf("    ");
             for (int x = 0; x < r->x; x++) {
                 BlockType b = r->grid[IDX(x,y,z)];
-                /* Abréviations 2 caractères */
-                const char *abbr[] = {"  ","FC","GR","ST","WA","GC","EN","GL","LH","RE"};
+                /* Abréviations 2 caractères : ordre = enum BlockType */
+                const char *abbr[] = {"FC","GR","GC","EN","GL","LH","RE"};
                 printf("%s ", abbr[(int)b]);
             }
             printf("\n");
