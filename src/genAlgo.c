@@ -4,28 +4,37 @@
 void flush(){
     int c;
     while ( (c = getchar()) != '\n' && c != EOF ) { }
+    c = getchar();
 }
 
 bool getSym(char dim){
-    char sym;
+    
     while(true){
+        char *symChar = NULL;
+        int read;
+        size_t len;
         printf("%c symetry [Y/n]:",dim);
-        sym = getchar();
-        if(sym == '\n'){
-            printf("Using symetry on %c\n",dim);
-            return true;
-        } else{
-            flush();
-            if(sym == 'Y' || sym == 'y'){
+        read = getline(&symChar, &len, stdin);
+        if (read <= 2){
+            if(symChar[0] == '\n'){
                 printf("Using symetry on %c\n",dim);
+                free(symChar);
                 return true;
-            } else if(sym == 'n' || sym == 'N'){
-                printf("Not using symetry on %c\n",dim);
-                return false;
-            } else {
-                printf("Error: please enter Y, y, N or n\n");
-                flush();
+            } else{
+                if(symChar[0] == 'Y' || symChar[0] == 'y'){
+                    printf("Using symetry on %c\n",dim);
+                    free(symChar);
+                    return true;
+                } else if(symChar[0] == 'n' || symChar[0] == 'N'){
+                    printf("Not using symetry on %c\n",dim);
+                    free(symChar);
+                    return false;
+                } else {
+                    printf("Error: please enter Y, y, N or n\n");
+                }
             }
+        } else {
+            printf("Errorrrr: please enter Y, y, N or n\n");
         }
     }
 }

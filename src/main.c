@@ -54,66 +54,41 @@ void plannerGA(const int X, const  int Y, const int Z, const double basePower, c
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 6)
-    {
-        fprintf(stderr, "Error: usage: %s <X size> <Y size> <Z size> <base power> <base heat>. Exiting program.\n", argv[0]);
-        return -1;
+    if (argc < 7) {
+        fprintf(stderr, "Usage: %s <X> <Y> <Z> <base_power> <base_heat> <gen_type>\n", argv[0]);
+        fprintf(stderr, "  X,Y,Z       : inside reactor's dimension\n");
+        fprintf(stderr, "  base_power  : base power\n");
+        fprintf(stderr, "  base_heat   : base heat\n");
+        fprintf(stderr, "  gen_type    : 1 - combination, 2 - genetic algorithm\n");
+        return 1;
     }
 
-    const int X = atoi (argv[1]);
+    const int X = atoi(argv[1]);
+    const int Y = atoi(argv[2]);
+    const int Z = atoi(argv[3]);
+    const double basePower = atof(argv[4]);
+    const double baseHeat  = atof(argv[5]);
+    const int genType = atoi(argv[6]);
+    const int SIZE = X * Y * Z;
 
-    if(X <= 0){
-        fprintf(stderr, "Error: X <= 0 Exiting program.");
-        return -1;
+    if (X <= 0 || Y <= 0 || Z <= 0 || SIZE > 100000) {
+        fprintf(stderr, "Error : wrong dimensions\n");
+        return 1;
     }
 
-    const int Y = atoi (argv[2]);
-
-    if(Y <= 0){
-        fprintf(stderr, "Error: Y <= 0 Exiting program.");
-        return -1;
+    if (genType != 1 && genType != 2) {
+        fprintf(stderr, "Error : wrong dimensions\n");
+        return 1;
     }
 
-    const int Z = atoi (argv[3]);
-
-    if(Z <= 0){
-        fprintf(stderr, "Error: Z <= 0 Exiting program.");
-        return -1;
-    }
-
-    const int basePower = atof (argv[4]);
-
-    if(Z <= 0){
-        fprintf(stderr, "Error: base power <= 0 Exiting program.");
-        return -1;
-    }
-
-    const int baseHeat = atof (argv[5]);
-
-    if(Z <= 0){
-        fprintf(stderr, "Error: base heat <= 0 Exiting program.");
-        return -1;
-    }
-
-    char choice;
-    while(true){
-        printf("Choose the generation type:\n[1] combination\n[2] genetic algorithm\nGeneration type ? ");
-        choice = getchar();
-        if(choice == '1'){
-            printf("Staring the combination generation with X=%d, Y=%d, Z=%d\n",X,Y,Z);
-            sleep(1);
-            flush();
-            combination(X, Y, Z, basePower, baseHeat);
-            break;
-        } else if(choice == '2'){
-            printf("Staring the genetic algorithm generation with X=%d, Y=%d, Z=%d\n",X,Y,Z);
-            flush();
-            plannerGA(X, Y, Z, basePower, baseHeat);
-            break;
-        } else {
-            printf("Error: please enter Y, y, N or n\n");
-            flush();
-        }
+    if(genType == 1){
+        printf("Staring the combination generation with X=%d, Y=%d, Z=%d\n",X,Y,Z);
+        combination(X, Y, Z, basePower, baseHeat);
+    } else if(genType == 2){
+        printf("Staring the genetic algorithm generation with X=%d, Y=%d, Z=%d\n",X,Y,Z);
+        plannerGA(X, Y, Z, basePower, baseHeat);
+    } else {
+        printf("Error: please enter Y, y, N or n\n");
     }
     
     return 0;
