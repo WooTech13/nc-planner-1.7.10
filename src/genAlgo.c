@@ -1,4 +1,4 @@
-#include "../include/plannerGA.h"
+#include "../include/genAlgo.h"
 #include <stddef.h>
 
 void flush(){
@@ -159,8 +159,8 @@ reactor_t* initializeReactor(args_t *args){
         }
     }
 
-    r->basePower = 150;
-    r->baseHeat = 25;
+    r->basePower = args->basePower;
+    r->baseHeat = args->baseHeat;
 
     calculatePowerHeat(r, args);
     setFitness(r, args);
@@ -386,7 +386,7 @@ reactor_t* selectParentTournament(listHead_t *population, int tournamentSize, ar
     return best;
 }
 
-void runGA(listHead_t *population, args_t *args){
+void runGenAlgo(listHead_t *population, args_t *args){
     listHead_t newPopulation;
     newPopulation.head = NULL;
     int bestCount = (int) sqrt(ELITE_RATIO * args->populationSize);    

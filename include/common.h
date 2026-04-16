@@ -24,6 +24,8 @@ typedef struct {
     const int X;
     const int Y;
     const int Z;
+    const double basePower;
+    const double baseHeat;
     const size_t populationSize;
     const size_t genMax;
     const bool xSym;

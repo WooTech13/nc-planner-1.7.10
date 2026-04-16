@@ -1,4 +1,4 @@
-#include "../include/planner.h"
+#include "../include/combination.h"
 
 int checkWholeMatrix(reactor_t *r, args_t *args){
     for (int y = 0; y < args->Y; y++) {

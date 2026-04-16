@@ -1,7 +1,7 @@
 #include "../include/main.h"
 
-void planner(const int X, const  int Y, const int Z){
-    args_t args = {X, Y, Z, 0, 0, 0, 0, 0};
+void combination(const int X, const  int Y, const int Z, const double basePower, const double baseHeat){
+    args_t args = {X, Y, Z, basePower, baseHeat, 0, 0, 0, 0, 0};
 
     listHead_t lHead;
     lHead.head = NULL;
@@ -21,7 +21,7 @@ void planner(const int X, const  int Y, const int Z){
     freeList(&lHead);
 }
 
-void plannerGA(const int X, const  int Y, const int Z){
+void plannerGA(const int X, const  int Y, const int Z, const double basePower, const double baseHeat){
     const bool xSym = getSym('X');
 
     const bool ySym = getSym('Y');
@@ -32,19 +32,11 @@ void plannerGA(const int X, const  int Y, const int Z){
 
     const size_t genMax = (size_t) 5 * sqrt(X * Y * Z);
 
-    args_t args = {X, Y, Z, populationSize, genMax, xSym, ySym, zSym };
+    args_t args = {X, Y, Z, basePower, baseHeat, populationSize, genMax, xSym, ySym, zSym };
 
     unsigned int *randBuf = (unsigned int *) malloc(sizeof(unsigned int));
     getrandom(randBuf,sizeof(unsigned int),GRND_NONBLOCK);
     srand(*randBuf);
-
-    /*reactor_t *r = initializeReactor(&args);
-    printReactor(r, &args);
-
-    fixFitness(r, &args);
-
-    printReactor(r, &args);
-    */
     
     listHead_t population;
     population.head = NULL;
@@ -52,7 +44,7 @@ void plannerGA(const int X, const  int Y, const int Z){
 
     initializePopulation(&population, &args);
 
-    runGA(&population, &args);
+    runGenAlgo(&population, &args);
 
     reactor_t *best = getBestReactor(&population);
     printReactor(best, &args);
@@ -62,9 +54,9 @@ void plannerGA(const int X, const  int Y, const int Z){
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 4)
+    if (argc != 6)
     {
-        fprintf(stderr, "Error: usage: %s <X size> <Y size> <Z size>. Exiting program.\n", argv[0]);
+        fprintf(stderr, "Error: usage: %s <X size> <Y size> <Z size> <base power> <base heat>. Exiting program.\n", argv[0]);
         return -1;
     }
 
@@ -89,6 +81,20 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
+    const int basePower = atof (argv[4]);
+
+    if(Z <= 0){
+        fprintf(stderr, "Error: base power <= 0 Exiting program.");
+        return -1;
+    }
+
+    const int baseHeat = atof (argv[5]);
+
+    if(Z <= 0){
+        fprintf(stderr, "Error: base heat <= 0 Exiting program.");
+        return -1;
+    }
+
     char choice;
     while(true){
         printf("Choose the generation type:\n[1] combination\n[2] genetic algorithm\nGeneration type ? ");
@@ -97,12 +103,12 @@ int main(int argc, char *argv[]) {
             printf("Staring the combination generation with X=%d, Y=%d, Z=%d\n",X,Y,Z);
             sleep(1);
             flush();
-            planner(X, Y, Z);
+            combination(X, Y, Z, basePower, baseHeat);
             break;
         } else if(choice == '2'){
             printf("Staring the genetic algorithm generation with X=%d, Y=%d, Z=%d\n",X,Y,Z);
             flush();
-            plannerGA(X, Y, Z);
+            plannerGA(X, Y, Z, basePower, baseHeat);
             break;
         } else {
             printf("Error: please enter Y, y, N or n\n");

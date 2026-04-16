@@ -1,5 +1,5 @@
-#ifndef PLANNER_H
-#define PLANNER_H
+#ifndef COMBINATION_H
+#define COMBINATION_H
 #include "../include/common.h"
 
 

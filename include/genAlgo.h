@@ -1,5 +1,5 @@
-#ifndef PLANNERGA_H
-#define PLANNERGA_H
+#ifndef GENALGO_H
+#define GENALGO_H
 #include "../include/common.h"
 #include <math.h>
 
@@ -42,6 +42,6 @@ reactor_t* selectParentRoulette(listHead_t *population);
 
 reactor_t* selectParentTournament(listHead_t *population, int tournamentSize, args_t *args);
 
-void runGA(listHead_t *population, args_t *args);
+void runGenAlgo(listHead_t *population, args_t *args);
 
 #endif
