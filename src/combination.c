@@ -1,21 +1,17 @@
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-#include <string.h>
+#include "../include/combination.h"
 
-int checkWholeMatrix(struct reactor *r, int X, int Y, int Z){
-    for (int y = 0; y < Y; y++) {
-        for (int z = 0; z < Z; z++) {
-            for (int x = 0; x < X; x++) {
-                switch (r->matrix[OFFSET(x, y, z, Y, Z)]) {
-                    case RED:
-                        if(getAdjacentBlock(r->matrix, x, y, z, X, Y, Z, CELL) == 0) return 0;
-                    case CELL:
+int checkWholeMatrix(reactor_t *r, args_t *args){
+    for (int y = 0; y < args->Y; y++) {
+        for (int z = 0; z < args->Z; z++) {
+            for (int x = 0; x < args->X; x++) {
+                switch (r->matrix[OFFSET(x, y, z, args->Y, args->Z)]) {
+                    case REDSTONE:
+                        if(getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args) == 0) return 0;
+                    case FUEL_CELL:
                         continue;
-                    case CRYO:
-                        if(getAdjacentBlock(r->matrix, x, y, z, X, Y, Z, CRYO) > 0) return 0;
-                    case HEL:
+                    case GELID_CRYOTHEUM:
+                        if(getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args) > 0) return 0;
+                    case LIQUID_HELIUM:
                         continue;
                     default:
                         return 0;
@@ -27,41 +23,41 @@ int checkWholeMatrix(struct reactor *r, int X, int Y, int Z){
     r->baseHeat = 25;
     r->totalPower = 0;
     r->totalHeat = 0;
-    calculatePowerHeat(r, X, Y, Z);
+    calculatePowerHeat(r, args);
     return r->totalHeat <= 0;
 
 }
 
-int incrementMatrix(uint8_t *matrix, size_t total_size) {
+int incrementMatrix(uint8_t *matrix, size_t total_size){
     for (size_t i = 0; i < total_size; i++) {
-        if (matrix[i] < HEL) {
+        if (matrix[i] < LIQUID_HELIUM) {
             matrix[i]++;
             return 1;
         }
-        matrix[i] = RED;
+        matrix[i] = REDSTONE;
     }
     return 0;
 }
 
-void generateMatrices(size_t X, size_t Y, size_t Z, struct listHead *lHead) {
-    uint8_t *matrix = setMatrix(X, Y, Z);
+void generateMatrices(listHead_t *lHead, args_t *args) {
+    uint8_t *matrix = setMatrix(args);
     uint64_t count = 0;
 
-    for (uint64_t i = 0; i < (1ULL << (2 * X * Y * Z)); i++) {
-        uint8_t *local_matrix = setMatrix(X, Y, Z);
-        for (size_t j = 0; j < X * Y * Z; j++) {
+    for (uint64_t i = 0; i < (1ULL << (2 * args->X * args->Y * args->Z)); i++) {
+        uint8_t *local_matrix = setMatrix(args);
+        for (int j = 0; j < args->X * args->Y * args->Z; j++) {
             local_matrix[j] = (i >> (2 * j)) & 3;
         }
-        struct reactor *r = (struct reactor *) malloc(sizeof(struct reactor));
+        reactor_t *r = (reactor_t *) malloc(sizeof(reactor_t));
         r->matrix = local_matrix;
-        if (checkWholeMatrix(r, X, Y, Z)) {
+        if (checkWholeMatrix(r, args)) {
             addToList(lHead, r);
         } else {
             free(r->matrix);
             free(r);
         }
         count++;
+        if(i%10000==0) printf("%ld\n",i);
     }
-    printf("Total matrices generated: %lu\n", count);
     free(matrix);
 }
