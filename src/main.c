@@ -21,7 +21,7 @@ void combination(const int X, const  int Y, const int Z, const double basePower,
     freeList(&lHead);
 }
 
-void plannerGA(const int X, const  int Y, const int Z, const double basePower, const double baseHeat){
+void genAlgo(const int X, const  int Y, const int Z, const double basePower, const double baseHeat){
     const bool xSym = getSym('X');
 
     const bool ySym = getSym('Y');
@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
         combination(X, Y, Z, basePower, baseHeat);
     } else if(genType == 2){
         printf("Staring the genetic algorithm generation with X=%d, Y=%d, Z=%d\n",X,Y,Z);
-        plannerGA(X, Y, Z, basePower, baseHeat);
+        genAlgo(X, Y, Z, basePower, baseHeat);
     } else {
         printf("Error: please enter Y, y, N or n\n");
     }

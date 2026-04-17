@@ -12,6 +12,6 @@
 
 void combination(const int X, const  int Y, const int Z, const double basePower, const double baseHeat);
 
-void plannerGA(const int X, const  int Y, const int Z, const double basePower, const double baseHeat);
+void genAlgo(const int X, const  int Y, const int Z, const double basePower, const double baseHeat);
 
 #endif
