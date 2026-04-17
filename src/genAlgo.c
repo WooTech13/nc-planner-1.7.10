@@ -1,11 +1,6 @@
 #include "../include/genAlgo.h"
-#include <stddef.h>
+//#include <stddef.h>
 
-void flush(){
-    int c;
-    while ( (c = getchar()) != '\n' && c != EOF ) { }
-    c = getchar();
-}
 
 bool getSym(char dim){
     
@@ -39,7 +34,7 @@ bool getSym(char dim){
     }
 }
 
-void setSymBlock(uint8_t *matrix, int x, int y, int z, int val, args_t *args){
+void setSymBlock(blockType_t *matrix, int x, int y, int z, int val, args_t *args){
     int xValues[] = {x, args->X - 1 - x};
     int yValues[] = {y, args->Y - 1 - y};
     int zValues[] = {z, args->Z - 1 - z};
@@ -58,9 +53,9 @@ void setFitness(reactor_t *r, args_t *args){
     double malusRatio = (double)(r->malus / totalBlock);
     
     if(malusRatio == 0) {
-        r->fitness =  (r->totalPower / r->totalHeat) * -1;
+        r->fitness =  (r->energy / r->heat) * -1;
     } else {
-        r->fitness =  ((r->totalPower / r->totalHeat) * -1) / malusRatio;
+        r->fitness =  ((r->energy / r->heat) * -1) / malusRatio;
     }
     //printf("Malus : %f, malus ratio : %f, fitness : %f\n", malusRatio, r->malus, r->fitness);
 }
@@ -72,7 +67,7 @@ void fineTuneReactor(reactor_t *r, args_t *args) {
                 switch (r->matrix[OFFSET(x, y, z, args->Y, args->Z)]) {
                     case REDSTONE:
                         if(getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args) == 0){
-                            if(r->totalHeat >= 0){
+                            if(r->heat >= 0){
                                 if(getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args) == 0) {
                                     setSymBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args);
                                 } else {
@@ -87,7 +82,7 @@ void fineTuneReactor(reactor_t *r, args_t *args) {
                         break;
                     case GELID_CRYOTHEUM:
                         if(getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args) != 0){
-                        if(r->totalHeat >= 0){
+                        if(r->heat >= 0){
                                 if(getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args) != 0) {
                                     setSymBlock(r->matrix, x, y, z, REDSTONE, args);
                                 } else {
@@ -99,7 +94,7 @@ void fineTuneReactor(reactor_t *r, args_t *args) {
                         }
                         break;
                     case LIQUID_HELIUM:
-                        if(r->totalHeat >= 0){
+                        if(r->heat >= 0){
                             if(getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args) != 0) {
                                 setSymBlock(r->matrix, x, y, z, REDSTONE, args);
                             } else if(getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args) == 0) {
@@ -168,9 +163,6 @@ reactor_t* initializeReactor(args_t *args){
         }
     }
 
-    r->basePower = args->basePower;
-    r->baseHeat = args->baseHeat;
-
     calculatePowerHeat(r, args);
     setFitness(r, args);
     return r;
@@ -181,10 +173,8 @@ reactor_t* copyReactor(reactor_t *oldReactor, args_t *args){
 
     r->matrix = setMatrix(args);
     copyMatrix(oldReactor->matrix, r->matrix, args);
-    r->basePower = oldReactor->basePower;
-    r->baseHeat = oldReactor->baseHeat;
-    r->totalPower = oldReactor->totalPower;
-    r->totalHeat = oldReactor->totalHeat;
+    r->energy = oldReactor->energy;
+    r->heat = oldReactor->heat;
     r->fitness = oldReactor->fitness;
     r->malus = oldReactor->malus;
 
@@ -269,7 +259,7 @@ void mutate(reactor_t *r, double adaptiveMutationRate, args_t *args){
     setFitness(r, args);
 }
 
-void crossover(uint8_t *parent1, uint8_t *parent2, uint8_t *newMatrix1, uint8_t *newMatrix2, args_t *args) {
+void crossover(blockType_t *parent1, blockType_t *parent2, blockType_t *newMatrix1, blockType_t *newMatrix2, args_t *args) {
     int crossoverPoint1 = rand() % (args->X * args->Y * args->Z);
     int crossoverPoint2 = rand() % (args->X * args->Y * args->Z);
     

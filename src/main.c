@@ -53,42 +53,71 @@ void genAlgo(const int X, const  int Y, const int Z, const double basePower, con
     free(randBuf);
 }
 
+void advGenAlgo() {
+    startAdvGenAlgo();
+}
+
 int main(int argc, char *argv[]) {
+    printf("1\n");
     if (argc < 7) {
-        fprintf(stderr, "Usage: %s <X> <Y> <Z> <base_power> <base_heat> <gen_type>\n", argv[0]);
-        fprintf(stderr, "  X,Y,Z       : inside reactor's dimension\n");
-        fprintf(stderr, "  base_power  : base power\n");
-        fprintf(stderr, "  base_heat   : base heat\n");
-        fprintf(stderr, "  gen_type    : 1 - combination, 2 - genetic algorithm\n");
+        fprintf(stderr, "Usage: %s <X> <Y> <Z> <base_power> <base_heat> [--sym AXES]\n", argv[0]);
+        fprintf(stderr, "  X,Y,Z       : dimensions intérieures du réacteur\n");
+        fprintf(stderr, "  base_power  : puissance de base du combustible\n");
+        fprintf(stderr, "  base_heat   : chaleur de base du combustible\n");
+        fprintf(stderr, "  --mode      : generation mode, ex: combination, genAglo, advGenAlgo\n");
+        fprintf(stderr, "  --sym AXES  : axes de symétrie, ex: X  XY  XZ  XYZ  (optionnel)\n");
+        fprintf(stderr, "  Exemples : ./reactor 5 5 5 60 18 --sym XZ\n");
+        fprintf(stderr, "             ./reactor 7 7 7 60 18 --sym XYZ\n");
         return 1;
     }
 
-    const int X = atoi(argv[1]);
-    const int Y = atoi(argv[2]);
-    const int Z = atoi(argv[3]);
-    const double basePower = atof(argv[4]);
-    const double baseHeat  = atof(argv[5]);
-    const int genType = atoi(argv[6]);
-    const int SIZE = X * Y * Z;
+    GX = atoi(argv[1]);
+    GY = atoi(argv[2]);
+    GZ = atoi(argv[3]);
+    BASE_POWER = atof(argv[4]);
+    BASE_HEAT  = atof(argv[5]);
+    GSIZE = GX * GY * GZ;
 
-    if (X <= 0 || Y <= 0 || Z <= 0 || SIZE > 100000) {
-        fprintf(stderr, "Error : wrong dimensions\n");
-        return 1;
+    /* Parse --sym */
+    for (int a = 7; a < argc; a++) {
+        if (strcmp(argv[a], "--sym") == 0 && a + 1 < argc) {
+            const char *axes = argv[a + 1];
+            for (int i = 0; axes[i]; i++) {
+                if (axes[i] == 'X' || axes[i] == 'x') SYM_X = true;
+                if (axes[i] == 'Y' || axes[i] == 'y') SYM_Y = true;
+                if (axes[i] == 'Z' || axes[i] == 'z') SYM_Z = true;
+            }
+            a++; /* saute la valeur */
+        }
     }
-
-    if (genType != 1 && genType != 2) {
-        fprintf(stderr, "Error : wrong dimensions\n");
+    printf("2\n");
+    if (GX <= 0 || GY <= 0 || GZ <= 0 || GSIZE > 100000) {
+        fprintf(stderr, "Erreur : dimensions invalides ou trop grandes (max ~46³)\n");
         return 1;
-    }
+    } 
 
-    if(genType == 1){
-        printf("Staring the combination generation with X=%d, Y=%d, Z=%d\n",X,Y,Z);
-        combination(X, Y, Z, basePower, baseHeat);
-    } else if(genType == 2){
-        printf("Staring the genetic algorithm generation with X=%d, Y=%d, Z=%d\n",X,Y,Z);
-        genAlgo(X, Y, Z, basePower, baseHeat);
-    } else {
-        printf("Error: please enter Y, y, N or n\n");
+    /* Parse --type */
+    for (int a = 6; a < argc; a++) {
+        if (strcmp(argv[a], "--mode") == 0 && a + 1 < argc) {
+
+            const char *types = argv[a + 1];
+            printf("%s\n",types);
+            printf("combination : %d, genAlgo, %d, advGenAlgo : %d\n",strcmp(types,"combination"),strcmp(types,"genAlgo"),strcmp(types,"advGenAlgo"));
+            if(strcmp(types,"combination") == 0){
+                printf("3\n");
+                combination(GX, GY, GZ, BASE_POWER, BASE_HEAT);
+            } else if(strcmp(types,"genAlgo") == 0) {
+                printf("4\n");
+                genAlgo(GX, GY, GZ, BASE_POWER, BASE_HEAT);
+            } else if(strcmp(types,"advGenAlgo") == 0){
+                printf("5\n");
+                advGenAlgo();
+            } else {
+                fprintf(stderr, "Error : wrong generation mode\n");
+                return 1;
+            }
+            a++; /* saute la valeur */
+        }
     }
     
     return 0;

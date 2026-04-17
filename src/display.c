@@ -2,7 +2,7 @@
 
 const char print[] = {'R','C','#','H','x'};
 
-void printTotalBlocks(uint8_t *matrix, args_t *args){
+void printTotalBlocks(blockType_t *matrix, args_t *args){
     int count_REDSTONE = 0, count_CRYOTHEUM = 0, count_FUEL_CELL = 0, count_LIQUID_HELIUM = 0;
     for (int y = 0; y < args->Y; y++) {
         for (int z = 0; z < args->Z; z++) {
@@ -43,7 +43,7 @@ void printTotalBlocks(uint8_t *matrix, args_t *args){
     printf("\n"); 
 }
 
-void printMatrix(uint8_t *matrix, args_t *args){
+void printMatrix(blockType_t *matrix, args_t *args){
     for (int y = 0; y < args->Y; y++) {
         for (int z = 0; z < args->Z; z++) {
             for (int x = 0; x < args->X; x++) {
@@ -57,7 +57,7 @@ void printMatrix(uint8_t *matrix, args_t *args){
 
 void printReactor(reactor_t *r, args_t *args) {
     printMatrix(r->matrix, args);
-    printf("With base power %f and base heat %f:\nPower: %f\nHeat: %f\nFitness: %f\nMalus: %f\n",r->basePower, r->baseHeat, r->totalPower, r->totalHeat, r->fitness, r->malus);
+    printf("With base power %f and base heat %f:\nPower: %f\nHeat: %f\nFitness: %f\nMalus: %f\n",BASE_POWER, BASE_HEAT, r->energy, r->heat, r->fitness, r->malus);
     printf("\n");
     printTotalBlocks(r->matrix, args);
 }

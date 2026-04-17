@@ -1,9 +1,9 @@
 #include "../include/common.h"
 
 
-uint8_t* setMatrix(args_t *args){
-    uint8_t *matrix = (uint8_t *) malloc(args->X * args->Y * args->Z * sizeof(uint8_t));
-    memset(matrix, REDSTONE, args->X * args->Y * args->Z * sizeof(uint8_t));
+blockType_t* setMatrix(args_t *args){
+    blockType_t *matrix = (blockType_t *) malloc(args->X * args->Y * args->Z * sizeof(blockType_t));
+    memset(matrix, REDSTONE, args->X * args->Y * args->Z * sizeof(blockType_t));
     
     return matrix;
 }
@@ -121,7 +121,7 @@ bool isInList(listHead_t *lHeadPtr, listItem_t *item){
     return false;   
 }
 
-int getAdjacentBlock(unsigned char *matrix, int x, int y, int z, blockType_t type, args_t *args){
+int getAdjacentBlock(blockType_t *matrix, int x, int y, int z, blockType_t type, args_t *args){
     int adj = 0;
 
     if((x-1) >= 0){
@@ -147,8 +147,8 @@ int getAdjacentBlock(unsigned char *matrix, int x, int y, int z, blockType_t typ
 }
 
 void calculatePowerHeat(reactor_t *r, args_t *args){
-    r->totalPower = 0;
-    r->totalHeat = 0;
+    r->energy = 0;
+    r->heat = 0;
     r->malus = 0;
     
     int adjFUEL_CELL;
@@ -158,16 +158,16 @@ void calculatePowerHeat(reactor_t *r, args_t *args){
                 switch (r->matrix[OFFSET(x, y, z, args->Y, args->Z)]) {
                     case REDSTONE:
                         if(getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args) != 0){
-                            r->totalHeat = r->totalHeat - 160;
+                            r->heat = r->heat - 160;
                         } else{
-                            r->totalHeat = r->totalHeat - 80;
+                            r->heat = r->heat - 80;
                             r->malus++;
                         }
                         break;
                     case FUEL_CELL:
                         adjFUEL_CELL = getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args);
-                        r->totalPower = r->totalPower + (adjFUEL_CELL + 1) * r->basePower;
-                        r->totalHeat = r->totalHeat + (((adjFUEL_CELL+1) * (adjFUEL_CELL + 2))/(double)2) * r->baseHeat;
+                        r->energy = r->energy + (adjFUEL_CELL + 1) * BASE_POWER;
+                        r->heat = r->heat + (((adjFUEL_CELL+1) * (adjFUEL_CELL + 2))/(double)2) * BASE_HEAT;
 
                         adjFUEL_CELL = getAdjacentBlock(r->matrix, x, y, z, REDSTONE, args);
                         if(adjFUEL_CELL == 0){
@@ -176,14 +176,14 @@ void calculatePowerHeat(reactor_t *r, args_t *args){
                         break;
                     case GELID_CRYOTHEUM:
                         if(getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args) == 0){
-                            r->totalHeat = r->totalHeat - 160;
+                            r->heat = r->heat - 160;
                         } else{
-                            r->totalHeat = r->totalHeat - 80;
+                            r->heat = r->heat - 80;
                             r->malus++;
                         }
                         break;
                     case LIQUID_HELIUM:
-                        r->totalHeat = r->totalHeat - 125;
+                        r->heat = r->heat - 125;
                         adjFUEL_CELL = getAdjacentBlock(r->matrix, x, y, z, FUEL_CELL, args);
                         int adjGELID_CRYOTHEUM = getAdjacentBlock(r->matrix, x, y, z, GELID_CRYOTHEUM, args);
                         if((adjFUEL_CELL > 0) || (adjGELID_CRYOTHEUM == 0)){
@@ -198,7 +198,7 @@ void calculatePowerHeat(reactor_t *r, args_t *args){
     }
 }
 
-void copyMatrix(uint8_t *matrixSrc, uint8_t *matrixDst, args_t *args){
+void copyMatrix(blockType_t *matrixSrc, blockType_t *matrixDst, args_t *args){
     for (int y = 0; y < args->Y; y++) {
         for (int z = 0; z < args->Z; z++) {
             for (int x = 0; x < args->X; x++) {
@@ -214,7 +214,7 @@ reactor_t* getBestReactor(listHead_t *lHeadPtr){
     reactor_t *best = item->r;
     double bestFitness = -RAND_MAX;
     while(item != NULL){
-        if(item->r->totalHeat <= 0){
+        if(item->r->heat <= 0){
             double curFitness = item->r->fitness;
             if(curFitness >= bestFitness){
                 best = item->r;

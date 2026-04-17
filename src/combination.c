@@ -19,16 +19,14 @@ int checkWholeMatrix(reactor_t *r, args_t *args){
             }
         }
     }
-    r->basePower = 150;
-    r->baseHeat = 25;
-    r->totalPower = 0;
-    r->totalHeat = 0;
+    r->energy = 0;
+    r->heat = 0;
     calculatePowerHeat(r, args);
-    return r->totalHeat <= 0;
+    return r->heat <= 0;
 
 }
 
-int incrementMatrix(uint8_t *matrix, size_t total_size){
+int incrementMatrix(blockType_t *matrix, size_t total_size){
     for (size_t i = 0; i < total_size; i++) {
         if (matrix[i] < LIQUID_HELIUM) {
             matrix[i]++;
@@ -40,11 +38,11 @@ int incrementMatrix(uint8_t *matrix, size_t total_size){
 }
 
 void generateMatrices(listHead_t *lHead, args_t *args) {
-    uint8_t *matrix = setMatrix(args);
+    blockType_t *matrix = setMatrix(args);
     uint64_t count = 0;
 
-    for (uint64_t i = 0; i < (1ULL << (2 * args->X * args->Y * args->Z)); i++) {
-        uint8_t *local_matrix = setMatrix(args);
+    for (blockType_t i = 0; i < (1ULL << (2 * args->X * args->Y * args->Z)); i++) {
+        blockType_t *local_matrix = setMatrix(args);
         for (int j = 0; j < args->X * args->Y * args->Z; j++) {
             local_matrix[j] = (i >> (2 * j)) & 3;
         }
