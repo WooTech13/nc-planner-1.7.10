@@ -14,72 +14,7 @@
  * Usage   : ./reactor <X> <Y> <Z> <base_power> <base_heat>
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
-#include <time.h>
-#include <float.h>
-
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
-/* ─── Types de blocs ─────────────────────────────────────────────────── */
-/* AIR, STANDARD et WATER retirés :
- *   - Le réacteur est supposé toujours plein (pas de case vide)
- *   - STANDARD : refroidissement trop faible (30-60) pour justifier une case
- *   - WATER     : refroidissement identique à STANDARD, condition bord triviale
- *   => 7 types restants, espace de recherche réduit de ~30%               */
-typedef enum {
-    FUEL_CELL = 0,
-    GRAPHITE,
-    GELID_CRYOTHEUM,
-    ENDERIUM,
-    GLOWSTONE,
-    LIQUID_HELIUM,
-    REDSTONE,
-    NUM_BLOCK_TYPES
-} BlockType;
-
-static const char *BLOCK_NAMES[] = {
-    "FUEL_CELL", "GRAPHITE", "GELID_CRYOTHEUM",
-    "ENDERIUM", "GLOWSTONE", "LIQUID_HELIUM", "REDSTONE"
-};
-
-/* ─── Paramètres de l'algorithme ─────────────────────────────────────── */
-#define POP_SIZE         200      /* taille population par île */
-#define NUM_ISLANDS      4        /* îles parallèles */
-#define GENERATIONS      2000     /* générations max */
-#define TOURNAMENT_K     5        /* taille tournoi */
-#define MUTATION_RATE    0.05     /* taux de mutation initial */
-#define CROSSOVER_RATE   0.75     /* taux de croisement */
-#define ELITE_RATIO      0.10     /* élite préservée */
-#define MIGRATION_FREQ   50       /* migration tous les N gen */
-#define MIGRATION_N      5        /* individus migrés */
-#define SA_ITERATIONS    500      /* itérations recuit simulé local */
-#define SA_TEMP_INIT     1000.0
-#define SA_COOLING       0.995
-#define STAGNATION_LIMIT 200      /* restart si stagnation */
-
-/* ─── Poids du score de fitness ──────────────────────────────────────── */
-/* On maximise energy, on pénalise heat > 0 très lourdement               */
-#define HEAT_OVERLOAD_PENALTY  1e9
-#define HEAT_CLOSE_TO_ZERO_BONUS_FACTOR 0.001  /* bonus si heat légèrement négatif */
-
-/* ─── Structure réacteur ─────────────────────────────────────────────── */
-typedef struct {
-    int x, y, z;          /* dimensions intérieures */
-    BlockType *grid;       /* taille x*y*z */
-    double energy;
-    double heat;
-    double fitness;
-} Reactor;
-
-/* ─── Paramètres globaux ─────────────────────────────────────────────── */
-static int GX, GY, GZ;
-static int GSIZE;
-static double BASE_POWER, BASE_HEAT;
+#include "nuclearcraft_optimizer.h"
 
 /* ═══════════════════════════════════════════════════════════════════════
  * ACCÈS GRILLE
@@ -92,10 +27,31 @@ static inline int in_bounds(int x, int y, int z) {
     return (x >= 0 && x < GX && y >= 0 && y < GY && z >= 0 && z < GZ);
 }
 
-/* 6 voisins orthogonaux */
-static const int DX[6] = {1,-1,0,0,0,0};
-static const int DY[6] = {0,0,1,-1,0,0};
-static const int DZ[6] = {0,0,0,0,1,-1};
+/* ─── Symétrie ───────────────────────────────────────────────────────── */
+
+static inline int canon(int v, int dim) {
+    return (v < (dim + 1) / 2) ? v : dim - 1 - v;
+}
+
+static void apply_symmetry(BlockType *g) {
+    if (!SYM_X && !SYM_Y && !SYM_Z) return;
+    for (int y = 0; y < GY; y++)
+    for (int z = 0; z < GZ; z++)
+    for (int x = 0; x < GX; x++) {
+        int cx = SYM_X ? canon(x, GX) : x;
+        int cy = SYM_Y ? canon(y, GY) : y;
+        int cz = SYM_Z ? canon(z, GZ) : z;
+        if (cx != x || cy != y || cz != z)
+            g[IDX(x,y,z)] = g[IDX(cx,cy,cz)];
+    }
+}
+
+static inline int is_canonical(int x, int y, int z) {
+    if (SYM_X && x > (GX - 1) / 2) return 0;
+    if (SYM_Y && y > (GY - 1) / 2) return 0;
+    if (SYM_Z && z > (GZ - 1) / 2) return 0;
+    return 1;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════
  * ÉVALUATION DU RÉACTEUR
@@ -115,6 +71,8 @@ static int count_adjacent(const BlockType *grid, int cx, int cy, int cz, BlockTy
 }
 
 static void evaluate(Reactor *r) {
+    /* Propage la symétrie avant tout calcul */
+    apply_symmetry(r->grid);
     const BlockType *g = r->grid;
     double total_energy = 0.0;
     double total_heat   = 0.0;
@@ -219,7 +177,6 @@ static void reactor_copy(Reactor *dst, const Reactor *src) {
 /* ═══════════════════════════════════════════════════════════════════════
  * GÉNÉRATEUR ALÉATOIRE THREAD-LOCAL
  * ═══════════════════════════════════════════════════════════════════════ */
-static unsigned int tl_seed[NUM_ISLANDS * POP_SIZE + 8];
 
 static inline unsigned int tl_rand(int tid) {
     tl_seed[tid] = tl_seed[tid] * 1664525u + 1013904223u;
@@ -238,19 +195,6 @@ static inline int tl_randi(int tid, int n) {
  * INITIALISATION
  * ═══════════════════════════════════════════════════════════════════════ */
 
-/* Probabilités de tirage par type de bloc (heuristique domain-specific) */
-/* Pas d'AIR : le réacteur est toujours plein.
- * Pas de STANDARD/WATER : refroidissement trop faible, retirés de l'espace. */
-static const double BLOCK_PROBS[NUM_BLOCK_TYPES] = {
-    0.25,  /* FUEL_CELL      - cœur du réacteur, favorisé */
-    0.12,  /* GRAPHITE       - boosteur d'énergie */
-    0.18,  /* GELID_CRYOTHEUM- meilleur refroidisseur isolé */
-    0.12,  /* ENDERIUM       - bon si près graphite */
-    0.08,  /* GLOWSTONE      - très puissant mais rare (besoin 6 graphites) */
-    0.13,  /* LIQUID_HELIUM  - refroidissement constant, fiable */
-    0.12,  /* REDSTONE       - bon si près fuel cell */
-};
-
 static BlockType random_block(int tid) {
     double r = tl_randf(tid);
     double cum = 0.0;
@@ -262,40 +206,49 @@ static BlockType random_block(int tid) {
 }
 
 static void randomize(Reactor *r, int tid) {
-    for (int i = 0; i < GSIZE; i++)
-        r->grid[i] = random_block(tid);
+    /* N'initialise que la zone canonique ; apply_symmetry() dans evaluate() complète */
+    for (int z = 0; z < GZ; z++)
+    for (int y = 0; y < GY; y++)
+    for (int x = 0; x < GX; x++)
+        if (is_canonical(x, y, z))
+            r->grid[IDX(x,y,z)] = random_block(tid);
     evaluate(r);
 }
 
 /* Graine heuristique : FUEL_CELL entouré de refroidisseurs */
 static void seed_heuristic(Reactor *r, int tid) {
-    /* Commence avec tous GELID_CRYOTHEUM (meilleur refroidisseur de base) */
-    for (int i = 0; i < GSIZE; i++)
-        r->grid[i] = GELID_CRYOTHEUM;
+    /* Initialise uniquement la zone canonique */
+    for (int z = 0; z < GZ; z++)
+    for (int y = 0; y < GY; y++)
+    for (int x = 0; x < GX; x++)
+        if (is_canonical(x, y, z))
+            r->grid[IDX(x,y,z)] = GELID_CRYOTHEUM;
 
-    /* Place des FUEL_CELL de manière espacée */
     int spacing = 2;
     for (int z = 0; z < GZ; z += spacing)
     for (int y = 0; y < GY; y += spacing)
-    for (int x = 0; x < GX; x += spacing) {
-        if (tl_randf(tid) < 0.5)
+    for (int x = 0; x < GX; x += spacing)
+        if (is_canonical(x, y, z) && tl_randf(tid) < 0.5)
             r->grid[IDX(x,y,z)] = FUEL_CELL;
-    }
 
-    /* Ajoute des GRAPHITE proches des FUEL_CELL */
+    /* Propage d'abord pour que count_adjacent() voie la grille complète */
+    apply_symmetry(r->grid);
+
     for (int z = 0; z < GZ; z++)
     for (int y = 0; y < GY; y++)
     for (int x = 0; x < GX; x++) {
-        if (r->grid[IDX(x,y,z)] != FUEL_CELL) {
-            if (count_adjacent(r->grid, x,y,z, FUEL_CELL) > 0 && tl_randf(tid) < 0.3)
-                r->grid[IDX(x,y,z)] = GRAPHITE;
-        }
+        if (!is_canonical(x, y, z)) continue;
+        if (r->grid[IDX(x,y,z)] != FUEL_CELL &&
+            count_adjacent(r->grid, x,y,z, FUEL_CELL) > 0 && tl_randf(tid) < 0.3)
+            r->grid[IDX(x,y,z)] = GRAPHITE;
     }
 
-    /* Quelques REDSTONE près des FUEL_CELL restants */
+    apply_symmetry(r->grid);
+
     for (int z = 0; z < GZ; z++)
     for (int y = 0; y < GY; y++)
     for (int x = 0; x < GX; x++) {
+        if (!is_canonical(x, y, z)) continue;
         int idx = IDX(x,y,z);
         if (r->grid[idx] == GELID_CRYOTHEUM &&
             count_adjacent(r->grid, x,y,z, FUEL_CELL) > 0 && tl_randf(tid) < 0.25)
@@ -319,57 +272,63 @@ static int tournament_select(Reactor **pop, int pop_size, int k, int tid) {
     return best;
 }
 
-/* Croisement uniforme 3D */
+/* Croisement uniforme — ne touche que la zone canonique */
 static void crossover(Reactor *child, const Reactor *p1, const Reactor *p2, int tid) {
-    for (int i = 0; i < GSIZE; i++)
+    for (int z = 0; z < GZ; z++)
+    for (int y = 0; y < GY; y++)
+    for (int x = 0; x < GX; x++) {
+        if (!is_canonical(x, y, z)) continue;
+        int i = IDX(x,y,z);
         child->grid[i] = (tl_randf(tid) < 0.5) ? p1->grid[i] : p2->grid[i];
+    }
 }
 
-/* Croisement par plan (coupe sur un axe aléatoire) */
+/* Croisement par plan — ne touche que la zone canonique */
 static void crossover_plane(Reactor *child, const Reactor *p1, const Reactor *p2, int tid) {
     int axis = tl_randi(tid, 3);
     int cut;
-    if (axis == 0)      cut = tl_randi(tid, GX);
-    else if (axis == 1) cut = tl_randi(tid, GY);
-    else                cut = tl_randi(tid, GZ);
+    if (axis == 0)      cut = tl_randi(tid, (GX + 1) / 2);
+    else if (axis == 1) cut = tl_randi(tid, (GY + 1) / 2);
+    else                cut = tl_randi(tid, (GZ + 1) / 2);
 
     for (int z = 0; z < GZ; z++)
     for (int y = 0; y < GY; y++)
     for (int x = 0; x < GX; x++) {
+        if (!is_canonical(x, y, z)) continue;
         int idx = IDX(x,y,z);
         int val = (axis==0)?x : (axis==1)?y : z;
         child->grid[idx] = (val < cut) ? p1->grid[idx] : p2->grid[idx];
     }
 }
 
-/* Mutation : change aléatoirement quelques blocs */
+/* Mutation simple — zone canonique uniquement */
 static void mutate(Reactor *r, double rate, int tid) {
-    for (int i = 0; i < GSIZE; i++) {
+    for (int z = 0; z < GZ; z++)
+    for (int y = 0; y < GY; y++)
+    for (int x = 0; x < GX; x++) {
+        if (!is_canonical(x, y, z)) continue;
         if (tl_randf(tid) < rate)
-            r->grid[i] = random_block(tid);
+            r->grid[IDX(x,y,z)] = random_block(tid);
     }
 }
 
-/* Mutation ciblée : si chaleur > 0, remplace des FUEL_CELL par des refroidisseurs */
+/* Mutation ciblée — zone canonique uniquement */
 static void mutate_targeted(Reactor *r, double rate, int tid) {
-    if (r->heat > 0) {
-        /* Remplace des FUEL_CELL ou blocs peu utiles par des refroidisseurs */
-        for (int i = 0; i < GSIZE; i++) {
+    for (int z = 0; z < GZ; z++)
+    for (int y = 0; y < GY; y++)
+    for (int x = 0; x < GX; x++) {
+        if (!is_canonical(x, y, z)) continue;
+        int i = IDX(x,y,z);
+        if (r->heat > 0) {
             if (tl_randf(tid) < rate) {
                 BlockType coolers[] = {GELID_CRYOTHEUM, LIQUID_HELIUM, ENDERIUM, REDSTONE, GLOWSTONE};
                 r->grid[i] = coolers[tl_randi(tid, 5)];
             }
-        }
-    } else {
-        /* Marge thermique disponible : favorise FUEL_CELL et GRAPHITE */
-        for (int i = 0; i < GSIZE; i++) {
+        } else {
             double rnd = tl_randf(tid);
-            if (rnd < rate * 0.4)
-                r->grid[i] = FUEL_CELL;
-            else if (rnd < rate * 0.6)
-                r->grid[i] = GRAPHITE;
-            else if (rnd < rate)
-                r->grid[i] = random_block(tid);
+            if (rnd < rate * 0.4)       r->grid[i] = FUEL_CELL;
+            else if (rnd < rate * 0.6)  r->grid[i] = GRAPHITE;
+            else if (rnd < rate)        r->grid[i] = random_block(tid);
         }
     }
 }
@@ -388,11 +347,14 @@ static void simulated_annealing(Reactor *r, int tid) {
     for (int iter = 0; iter < SA_ITERATIONS; iter++) {
         reactor_copy(neighbor, current);
 
-        /* Perturbation : change 1 à 3 blocs aléatoires */
+        /* Perturbation : change 1 à 3 blocs dans la zone canonique */
         int n_changes = 1 + tl_randi(tid, 3);
         for (int k = 0; k < n_changes; k++) {
-            int idx = tl_randi(tid, GSIZE);
-            neighbor->grid[idx] = random_block(tid);
+            /* Tirage d'une cellule canonique aléatoire */
+            int cx = SYM_X ? tl_randi(tid, (GX + 1) / 2) : tl_randi(tid, GX);
+            int cy = SYM_Y ? tl_randi(tid, (GY + 1) / 2) : tl_randi(tid, GY);
+            int cz = SYM_Z ? tl_randi(tid, (GZ + 1) / 2) : tl_randi(tid, GZ);
+            neighbor->grid[IDX(cx,cy,cz)] = random_block(tid);
         }
         evaluate(neighbor);
 
@@ -430,6 +392,9 @@ static void print_reactor(const Reactor *r) {
     printf("  MEILLEUR RÉACTEUR TROUVÉ\n");
     printf("══════════════════════════════════════════════\n");
     printf("  Dimensions intérieures : %dx%dx%d\n", r->x, r->y, r->z);
+    if (SYM_X || SYM_Y || SYM_Z)
+        printf("  Symétrie active        :%s%s%s\n",
+               SYM_X?" X":"", SYM_Y?" Y":"", SYM_Z?" Z":"");
     printf("  Énergie produite       : %.2f RF/t\n", r->energy);
     printf("  Chaleur nette          : %.2f H/t\n", r->heat);
     printf("  Score fitness          : %.4f\n", r->fitness);
@@ -446,9 +411,9 @@ static void print_reactor(const Reactor *r) {
             printf("    %-20s : %d\n", BLOCK_NAMES[t], counts[t]);
 
     printf("\n  Disposition par couche Z :\n");
-    for (int z = 0; z < r->z; z++) {
-        printf("  -- Couche Z=%d --\n", z);
-        for (int y = 0; y < r->y; y++) {
+    for (int y = 0; y < r->y; y++) {
+        printf("  -- Couche Y=%d --\n", y);
+        for (int z = 0; z < r->z; z++) {
             printf("    ");
             for (int x = 0; x < r->x; x++) {
                 BlockType b = r->grid[IDX(x,y,z)];
@@ -466,10 +431,13 @@ static void print_reactor(const Reactor *r) {
  * ═══════════════════════════════════════════════════════════════════════ */
 int main(int argc, char *argv[]) {
     if (argc < 6) {
-        fprintf(stderr, "Usage: %s <X> <Y> <Z> <base_power> <base_heat>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <X> <Y> <Z> <base_power> <base_heat> [--sym AXES]\n", argv[0]);
         fprintf(stderr, "  X,Y,Z       : dimensions intérieures du réacteur\n");
         fprintf(stderr, "  base_power  : puissance de base du combustible\n");
         fprintf(stderr, "  base_heat   : chaleur de base du combustible\n");
+        fprintf(stderr, "  --sym AXES  : axes de symétrie, ex: X  XY  XZ  XYZ  (optionnel)\n");
+        fprintf(stderr, "  Exemples : ./reactor 5 5 5 60 18 --sym XZ\n");
+        fprintf(stderr, "             ./reactor 7 7 7 60 18 --sym XYZ\n");
         return 1;
     }
 
@@ -480,14 +448,37 @@ int main(int argc, char *argv[]) {
     BASE_HEAT  = atof(argv[5]);
     GSIZE = GX * GY * GZ;
 
+    /* Parse --sym */
+    for (int a = 6; a < argc; a++) {
+        if (strcmp(argv[a], "--sym") == 0 && a + 1 < argc) {
+            const char *axes = argv[a + 1];
+            for (int i = 0; axes[i]; i++) {
+                if (axes[i] == 'X' || axes[i] == 'x') SYM_X = 1;
+                if (axes[i] == 'Y' || axes[i] == 'y') SYM_Y = 1;
+                if (axes[i] == 'Z' || axes[i] == 'z') SYM_Z = 1;
+            }
+            a++; /* saute la valeur */
+        }
+    }
+
     if (GX <= 0 || GY <= 0 || GZ <= 0 || GSIZE > 100000) {
         fprintf(stderr, "Erreur : dimensions invalides ou trop grandes (max ~46³)\n");
         return 1;
     }
 
+    /* Calcul de la taille effective de l'espace de recherche canonique */
+    int cx = SYM_X ? (GX + 1) / 2 : GX;
+    int cy = SYM_Y ? (GY + 1) / 2 : GY;
+    int cz = SYM_Z ? (GZ + 1) / 2 : GZ;
+    int canon_size = cx * cy * cz;
+
     printf("NuclearCraft Reactor Optimizer\n");
-    printf("Dimensions : %dx%dx%d | base_power=%.1f | base_heat=%.1f\n",
-           GX, GY, GZ, BASE_POWER, BASE_HEAT);
+    printf("Dimensions : %dx%dx%d (%d blocs) | base_power=%.1f | base_heat=%.1f\n",
+           GX, GY, GZ, GSIZE, BASE_POWER, BASE_HEAT);
+    printf("Symétrie   : [%s] [%s] [%s]  →  zone canonique %dx%dx%d (%d blocs, espace /%.0f)\n",
+           SYM_X?"X":" ", SYM_Y?"Y":" ", SYM_Z?"Z":" ",
+           cx, cy, cz, canon_size,
+           (double)GSIZE / canon_size);
     printf("Algorithme : Island Genetic + Simulated Annealing + OpenMP\n\n");
 
     /* Initialisation des seeds */
